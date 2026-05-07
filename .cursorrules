@@ -1,0 +1,7 @@
+# Woolworths Planogram App Rules
+- Framework: Flutter
+- State Management: Riverpod
+- Vision Provider: Claude 3.5 Sonnet API
+- Architecture: Feature-first (lib/features/scanner, lib/features/inventory)
+- UI: Material 3, Dark Mode support, High contrast for retail environments.
+- Rule: Always use the `anthropic_sdk_dart` package for Vision tasks.

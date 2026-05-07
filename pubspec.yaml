@@ -1,0 +1,29 @@
+name: woolies_scanner
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.11.3
+
+dependencies:
+  anthropic_sdk_dart: ^2.2.0
+  flutter:
+    sdk: flutter
+  flutter_dotenv: ^6.0.1
+  flutter_riverpod: ^3.3.1
+  go_router: ^17.2.3
+  image_picker: ^1.2.2
+  path: ^1.9.1
+  sqflite: ^2.4.2+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
