@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../models/fge_model.dart';
 import 'planogram_parser.dart'; // Reuse ApiException
 
@@ -17,7 +17,7 @@ class FgeParser {
   FgeParser(this.apiKey);
 
   /// Analyzes an FGE planogram sheet image and returns structured [FgePlanogram].
-  Future<FgePlanogram> processFgeSheet(File imageFile) async {
+  Future<FgePlanogram> processFgeSheet(XFile imageFile) async {
     final bytes = await imageFile.readAsBytes();
     final base64Image = base64Encode(bytes);
 
@@ -67,7 +67,7 @@ class FgeParser {
   }
 
   /// Builds the detailed FGE-specific prompt for Claude.
-  String _buildPrompt() {
+  String _buildPrompt() { /* ... FGE prompt ... */
     return '''You are analyzing a Woolworths FGE (Front Gondola End) "Weekly Sales Plan" sheet for nightfill workers.
 
 CRITICAL — DATE EXTRACTION RULE:
@@ -218,7 +218,6 @@ IMPORTANT RULES:
     final pB = priority(idB);
     if (pA != pB) return pA.compareTo(pB);
 
-    // Both are FGE, sort by numeric ID
     final numA = _extractNumericId(idA);
     final numB = _extractNumericId(idB);
     return numA.compareTo(numB);

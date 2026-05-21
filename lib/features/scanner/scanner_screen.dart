@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,7 +45,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
       // Image preprocessing happens inside analyzeImage (EXIF + resize to 2576px)
       setState(() => _statusMessage = 'Analyzing sheet...');
-      final results = await claudeService.analyzeImage(File(image.path));
+
+      final results = await claudeService.analyzeImage(image);
 
       if (results.isEmpty) {
         throw Exception(
@@ -89,19 +89,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         );
       }).toList();
 
-      // Check if the date folder already exists (consolidation)
-      final existingDates =
-          await ref.read(localProductDatabaseProvider).fetchUniqueDates();
-      final bool isNewDate = scannedProducts.isEmpty ||
-          scannedProducts
-              .every((p) => !existingDates.contains(p.planogramDate));
-
       setState(
           () => _statusMessage = 'Saving ${scannedProducts.length} items...');
 
-      await ref
-          .read(localProductDatabaseProvider)
-          .insertProducts(scannedProducts);
+      await ref.read(supabaseServiceProvider).insertProducts(scannedProducts);
 
       // Force immediate recomputation so home screen shows updated data on pop.
       ref.invalidate(planogramDatesProvider);
@@ -112,9 +103,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       await ref.read(totalDatabaseItemsProvider.future);
 
       if (mounted) {
-        final msg = isNewDate
-            ? 'SAVED ${scannedProducts.length} ITEMS'
-            : 'APPENDED ${scannedProducts.length} ITEMS TO EXISTING FOLDER';
+        final msg = 'SAVED ${scannedProducts.length} ITEMS';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),

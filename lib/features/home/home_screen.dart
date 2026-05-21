@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/product_model.dart';
-import '../../core/services/local_product_database.dart';
+import '../../core/services/supabase_service.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
 
@@ -138,7 +138,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(localProductDatabaseProvider).deleteByDate(date);
+      await ref.read(supabaseServiceProvider).deleteByDate(date);
       ref.invalidate(planogramDatesProvider);
       ref.invalidate(totalDatabaseItemsProvider);
     }
@@ -414,8 +414,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 final groupedCountsProvider =
     FutureProvider.family<List<SheetCategorySummary>, String>(
         (ref, date) async {
-  final db = ref.read(localProductDatabaseProvider);
-  return db.fetchGroupedCountsByDate(date);
+  final svc = ref.read(supabaseServiceProvider);
+  return svc.fetchGroupedCountsByDate(date);
 });
 
 /// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).

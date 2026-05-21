@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,7 +30,7 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
 
       await ref
           .read(planogramProvider.notifier)
-          .processImage(File(image.path));
+          .processImage(image);
 
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -152,29 +151,20 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
         : error.contains('FormatException')
             ? 'Could not parse the sheet. Try a clearer photo.'
             : 'Something went wrong. Try again.';
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                size: 64, color: Colors.red),
+            const Icon(Icons.error_outline_rounded, size: 64, color: Colors.red),
             const SizedBox(height: 16),
-            const Text(
-              'PARSE FAILED',
-              style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18),
-            ),
+            const Text('PARSE FAILED',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.w900, fontSize: 18)),
             const SizedBox(height: 8),
-            Text(
-              displayMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red, fontSize: 13),
-            ),
+            Text(displayMessage, textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red, fontSize: 13)),
             const SizedBox(height: 32),
             ElevatedButton.icon(
               onPressed: _pickAndProcessImage,
@@ -210,58 +200,36 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
         children: [
           const Icon(Icons.calendar_today, color: AppColors.white, size: 14),
           const SizedBox(width: 8),
-          Text(
-            planogram.planogramDate,
-            style: const TextStyle(
-              color: AppColors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-            ),
-          ),
+          Text(planogram.planogramDate,
+              style: const TextStyle(
+                  color: AppColors.white, fontWeight: FontWeight.bold, fontSize: 13)),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${planogram.totalProducts} ITEMS',
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          _headerChip('${planogram.totalProducts} ITEMS'),
           const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${planogram.totalAisles} AISLES',
-              style: const TextStyle(
-                color: AppColors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
+          _headerChip('${planogram.totalAisles} AISLES'),
         ],
       ),
     );
   }
 
+  Widget _headerChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(label,
+          style: const TextStyle(
+              color: AppColors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+    );
+  }
+
   Widget _buildGrid(Planogram planogram) {
-    // Display in a 4-column grid (3 rows of 4 = 12 boxes)
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Grid of 12 aisles
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -287,7 +255,6 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
               );
             },
           ),
-          // Expanded detail for selected aisle
           if (_selectedAisleId != null)
             _buildSelectedAisleDetail(planogram),
         ],
@@ -298,12 +265,9 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
   Widget _buildSelectedAisleDetail(Planogram planogram) {
     final aisle = planogram.aisles.firstWhere(
       (a) => a.id == _selectedAisleId,
-      orElse: () => const PlanogramAisle(
-          id: '', promoType: '', shelves: []),
+      orElse: () => const PlanogramAisle(id: '', promoType: '', shelves: []),
     );
-
     if (aisle.id.isEmpty) return const SizedBox.shrink();
-
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: _AisleDetailCard(aisle: aisle),
@@ -311,17 +275,11 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
   }
 }
 
-/// Individual grid tile for an OGE box
 class _AisleGridTile extends StatelessWidget {
   final PlanogramAisle aisle;
   final bool isSelected;
   final VoidCallback onTap;
-
-  const _AisleGridTile({
-    required this.aisle,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _AisleGridTile({required this.aisle, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -340,28 +298,22 @@ class _AisleGridTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              aisle.id.replaceAll('OGE', ''),
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w900,
-                color: isSelected ? AppColors.white : AppColors.black,
-              ),
-            ),
+            Text(aisle.id.replaceAll('OGE', ''),
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: isSelected ? AppColors.white : AppColors.black)),
             const SizedBox(height: 4),
-            Text(
-              aisle.promoType.isNotEmpty ? aisle.promoType : '—',
-              style: TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
-                color: isSelected
-                    ? AppColors.white.withValues(alpha: 0.7)
-                    : AppColors.grey,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            Text(aisle.promoType.isNotEmpty ? aisle.promoType : '—',
+                style: TextStyle(
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected
+                        ? AppColors.white.withValues(alpha: 0.7)
+                        : AppColors.grey),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -371,14 +323,11 @@ class _AisleGridTile extends StatelessWidget {
                     : AppColors.black.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Text(
-                '${aisle.shelves.length} shelves',
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? AppColors.white : AppColors.grey,
-                ),
-              ),
+              child: Text('${aisle.shelves.length} shelves',
+                  style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? AppColors.white : AppColors.grey)),
             ),
           ],
         ),
@@ -387,10 +336,8 @@ class _AisleGridTile extends StatelessWidget {
   }
 }
 
-/// Expanded detail card showing shelf-by-shelf breakdown for a selected aisle
 class _AisleDetailCard extends StatelessWidget {
   final PlanogramAisle aisle;
-
   const _AisleDetailCard({required this.aisle});
 
   @override
@@ -405,48 +352,38 @@ class _AisleDetailCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             decoration: const BoxDecoration(
               color: AppColors.black,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(13)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(13)),
             ),
             child: Row(
               children: [
                 const Icon(Icons.shelves, color: AppColors.white, size: 18),
                 const SizedBox(width: 10),
-                Text(
-                  aisle.id.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16,
-                  ),
-                ),
+                Text(aisle.id.toUpperCase(),
+                    style: const TextStyle(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16)),
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text(
-                    aisle.promoType.toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Text(aisle.promoType.toUpperCase(),
+                      style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
-          // Shelves
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -468,10 +405,8 @@ class _AisleDetailCard extends StatelessWidget {
   }
 }
 
-/// One shelf row showing products at that level
 class _ShelfRow extends StatelessWidget {
   final PlanogramShelf shelf;
-
   const _ShelfRow({required this.shelf});
 
   @override
@@ -485,7 +420,6 @@ class _ShelfRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Shelf level header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -495,41 +429,29 @@ class _ShelfRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.horizontal_rule,
-                    color: AppColors.white, size: 12),
+                const Icon(Icons.horizontal_rule, color: AppColors.white, size: 12),
                 const SizedBox(width: 6),
-                Text(
-                  'SHELF ${shelf.level}',
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                Text('SHELF ${shelf.level}',
+                    style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5)),
                 const Spacer(),
-                Text(
-                  '${shelf.products.length} product${shelf.products.length == 1 ? '' : 's'}',
-                  style: TextStyle(
-                    color: AppColors.white.withValues(alpha: 0.6),
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('${shelf.products.length} product${shelf.products.length == 1 ? '' : 's'}',
+                    style: TextStyle(
+                        color: AppColors.white.withValues(alpha: 0.6),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          // Products on this shelf
           if (shelf.products.isEmpty)
             const Padding(
               padding: EdgeInsets.all(12),
-              child: Text(
-                'No products listed',
-                style: TextStyle(
-                    color: AppColors.grey,
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic),
-              ),
+              child: Text('No products listed',
+                  style: TextStyle(
+                      color: AppColors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
             )
           else
             Padding(
@@ -539,7 +461,6 @@ class _ShelfRow extends StatelessWidget {
                   final product = entry.value;
                   final isMultiColumn = shelf.products.length > 1;
                   final isLast = entry.key == shelf.products.length - 1;
-
                   return Column(
                     children: [
                       Row(
@@ -548,33 +469,26 @@ class _ShelfRow extends StatelessWidget {
                           if (isMultiColumn)
                             Container(
                               margin: const EdgeInsets.only(right: 10, top: 2),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 5, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.black.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                '${entry.key + 1}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.grey,
-                                ),
-                              ),
+                              child: Text('${entry.key + 1}',
+                                  style: const TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      color: AppColors.grey)),
                             ),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  product.name.toUpperCase(),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.black,
-                                  ),
-                                ),
+                                Text(product.name.toUpperCase(),
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.black)),
                                 const SizedBox(height: 4),
                                 Wrap(
                                   spacing: 6,
@@ -600,17 +514,14 @@ class _ShelfRow extends StatelessWidget {
   }
 }
 
-/// Small chip displaying a reference number, tappable to copy
 class _RefChip extends StatelessWidget {
   final String ref;
-
   const _RefChip({required this.ref});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        // Copy to clipboard
         final data = ref.trim();
         if (data.isNotEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -630,14 +541,11 @@ class _RefChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           border: Border.all(color: AppColors.grey.withValues(alpha: 0.2)),
         ),
-        child: Text(
-          ref,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: AppColors.black,
-          ),
-        ),
+        child: Text(ref,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.black)),
       ),
     );
   }

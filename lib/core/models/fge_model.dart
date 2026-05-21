@@ -7,7 +7,8 @@ enum ItemStatus { normal, added, removed }
 class FgeItem {
   final String name;
   final String ref;
-  final String position; // e.g., "left_vertical", "right_vertical", "top", "bottom"
+  final String
+      position; // e.g., "left_vertical", "right_vertical", "top", "bottom"
   final ItemStatus status;
 
   const FgeItem({
@@ -72,13 +73,17 @@ enum FgeLayoutType {
     switch (value.toLowerCase().trim()) {
       case 'standard_shelved':
       case 'standard':
+      case 'standardshelved':
         return FgeLayoutType.standardShelved;
       case 'vertical_bulk':
       case 'bulk':
+      case 'verticalbulk':
         return FgeLayoutType.verticalBulk;
       case 'side_stack':
+      case 'sidestack':
         return FgeLayoutType.sideStack;
       case 'entrance_bin':
+      case 'entrancebin':
         return FgeLayoutType.entranceBin;
       default:
         return FgeLayoutType.unknown;
@@ -117,7 +122,8 @@ class FgeSection {
   }
 
   /// All ref numbers across this section.
-  List<String> get allRefs => allItems.map((i) => i.ref).where((r) => r.isNotEmpty).toList();
+  List<String> get allRefs =>
+      allItems.map((i) => i.ref).where((r) => r.isNotEmpty).toList();
 
   bool get hasRemovedItems => allItems.any((i) => i.isRemoved);
   bool get hasAddedItems => allItems.any((i) => i.isAdded);
@@ -128,11 +134,13 @@ class FgeSection {
         'header': header,
         'notes': notes,
         if (items.isNotEmpty) 'items': items.map((i) => i.toMap()).toList(),
-        if (shelves.isNotEmpty) 'shelves': shelves.map((s) => s.toMap()).toList(),
+        if (shelves.isNotEmpty)
+          'shelves': shelves.map((s) => s.toMap()).toList(),
       };
 
   factory FgeSection.fromMap(Map<String, dynamic> map) {
-    final layout = FgeLayoutType.fromString(map['layout_type'] as String? ?? '');
+    final layout =
+        FgeLayoutType.fromString(map['layout_type'] as String? ?? '');
     return FgeSection(
       id: map['id'] as String? ?? '',
       layoutType: layout,
@@ -191,7 +199,8 @@ class FgePlanogram {
 
   factory FgePlanogram.fromMap(Map<String, dynamic> map) => FgePlanogram(
         planogramDate: map['planogram_date'] as String? ?? '',
-        sheetType: map['sheet_type'] as String? ?? 'Front Gondola Ends & Entrance Display',
+        sheetType: map['sheet_type'] as String? ??
+            'Front Gondola Ends & Entrance Display',
         sections: (map['sections'] as List<dynamic>?)
                 ?.map((e) => FgeSection.fromMap(e as Map<String, dynamic>))
                 .toList() ??

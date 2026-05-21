@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../models/planogram_model.dart';
 
 /// Service that uses Claude Opus 4.7 Vision API to parse Woolworths
@@ -15,8 +16,7 @@ class PlanogramParser {
 
   PlanogramParser(this.apiKey);
 
-  /// Analyzes a planogram sheet image and returns structured [Planogram] data.
-  Future<Planogram> processPlanogram(File imageFile) async {
+  Future<Planogram> processPlanogram(XFile imageFile) async {
     final bytes = await imageFile.readAsBytes();
     final base64Image = base64Encode(bytes);
 

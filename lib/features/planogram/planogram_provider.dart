@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../core/models/planogram_model.dart';
 import '../../core/services/planogram_parser.dart';
@@ -28,14 +28,13 @@ class PlanogramNotifier extends StateNotifier<AsyncValue<Planogram?>> {
   PlanogramNotifier(this._ref) : super(const AsyncValue.data(null));
 
   /// Process a planogram sheet image
-  Future<void> processImage(File image) async {
+  Future<void> processImage(XFile image) async {
     state = const AsyncValue.loading();
 
     final parser = _ref.read(planogramParserProvider);
     if (parser == null) {
       state = AsyncValue.error(
-        Exception(
-            'ANTHROPIC_API_KEY is not set. Add it to your .env file.'),
+        Exception('ANTHROPIC_API_KEY is not set. Add it to your .env file.'),
         StackTrace.current,
       );
       return;

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -42,7 +41,7 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
 
       await ref
           .read(fgePlanogramProvider.notifier)
-          .processImage(File(image.path));
+          .processImage(image);
 
       if (mounted) setState(() => _isProcessing = false);
     } catch (e) {
@@ -93,20 +92,15 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
       ),
       body: Column(
         children: [
-          // Search bar (shown when data is loaded)
           if (fgeAsync.valueOrNull != null) _buildSearchBar(),
-
-          // Main content
           Expanded(
             child: fgeAsync.when(
               data: (planogram) {
                 if (planogram == null) return _buildEmptyState();
                 final sections = ref.watch(fgeFilteredSectionsProvider);
-
                 if (sections.isEmpty && searchQuery.isNotEmpty) {
                   return _buildNoResults();
                 }
-
                 return _buildSectionList(planogram, sections);
               },
               loading: () => const Center(
@@ -236,7 +230,6 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         : error.contains('FormatException')
             ? 'Could not parse the sheet. Try a clearer photo.'
             : 'Something went wrong. Try again.';
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -280,11 +273,8 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Header bar with stats
         _buildStatsHeader(planogram),
         const SizedBox(height: 16),
-
-        // Section list
         ...sections.map((section) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _buildSectionCard(section),
@@ -321,11 +311,9 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
     );
   }
 
-  /// Renders a single section card with layout-adaptive content.
   Widget _buildSectionCard(FgeSection section) {
     final isExpanded = _expandedSectionId == section.id;
     final hasAlerts = section.hasAddedItems || section.hasRemovedItems;
-
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -338,10 +326,7 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section header (always visible)
           _buildSectionHeader(section, isExpanded, hasAlerts),
-
-          // Expandable content
           if (isExpanded) ...[
             const Divider(height: 1, color: AppColors.lightGrey),
             _buildSectionContent(section),
@@ -365,82 +350,60 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Layout type icon
             _buildLayoutIcon(section.layoutType),
             const SizedBox(width: 12),
-
-            // Section info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Text(
-                        section.id.toUpperCase(),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                          color: AppColors.black,
-                        ),
-                      ),
+                      Text(section.id.toUpperCase(),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: AppColors.black)),
                       if (hasAlerts) ...[
                         const SizedBox(width: 8),
                         if (section.hasAddedItems)
-                          const _AlertChip(
-                            label: 'ADDED',
-                            color: Colors.blue,
-                          ),
+                          const _AlertChip(label: 'ADDED', color: Colors.blue),
                         if (section.hasRemovedItems) ...[
                           const SizedBox(width: 4),
-                          const _AlertChip(
-                            label: 'REMOVED',
-                            color: Colors.red,
-                          ),
+                          const _AlertChip(label: 'REMOVED', color: Colors.red),
                         ],
                       ],
                     ],
                   ),
                   if (section.header.isNotEmpty) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      section.header,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.grey.withValues(alpha: 0.8),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(section.header,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.grey.withValues(alpha: 0.8)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                   ],
                 ],
               ),
             ),
-
-            // Product count
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.black.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Text(
-                '${section.totalProducts}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.black,
-                ),
-              ),
+              child: Text('${section.totalProducts}',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.black)),
             ),
             const SizedBox(width: 8),
-            Icon(
-              isExpanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded,
-              color: AppColors.grey,
-            ),
+            Icon(isExpanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+                color: AppColors.grey),
           ],
         ),
       ),
@@ -471,35 +434,28 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
     );
   }
 
-  /// Adaptive content rendering based on layout type.
   Widget _buildSectionContent(FgeSection section) {
     switch (section.layoutType) {
       case FgeLayoutType.standardShelved:
         return _buildShelvedContent(section);
       case FgeLayoutType.verticalBulk:
+      case FgeLayoutType.entranceBin:
+      case FgeLayoutType.unknown:
         return _buildVerticalBulkContent(section);
       case FgeLayoutType.sideStack:
         return _buildSideStackContent(section);
-      case FgeLayoutType.entranceBin:
-        return _buildVerticalBulkContent(section);
-      case FgeLayoutType.unknown:
-        return _buildVerticalBulkContent(section);
     }
   }
 
-  /// Renders standard shelved layout (shelves with levels).
   Widget _buildShelvedContent(FgeSection section) {
     if (section.shelves.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(16),
-        child: Text(
-          'No shelf data available',
-          style: TextStyle(
-              color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic),
-        ),
+        child: Text('No shelf data available',
+            style: TextStyle(
+                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -513,19 +469,15 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
     );
   }
 
-  /// Renders vertical bulk layout (items in a single column).
   Widget _buildVerticalBulkContent(FgeSection section) {
     if (section.items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(16),
-        child: Text(
-          'No items listed',
-          style: TextStyle(
-              color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic),
-        ),
+        child: Text('No items listed',
+            style: TextStyle(
+                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Container(
@@ -536,7 +488,6 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         ),
         child: Column(
           children: [
-            // "Vertical Bulk" badge
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -549,19 +500,15 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
                   Icon(Icons.vertical_align_center_rounded,
                       color: AppColors.white, size: 12),
                   SizedBox(width: 6),
-                  Text(
-                    'VERTICAL LAYOUT',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
+                  Text('VERTICAL LAYOUT',
+                      style: TextStyle(
+                          color: AppColors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5)),
                 ],
               ),
             ),
-            // Items
             Padding(
               padding: const EdgeInsets.all(10),
               child: Column(
@@ -583,25 +530,19 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
     );
   }
 
-  /// Renders side stack layout.
   Widget _buildSideStackContent(FgeSection section) {
-    // Group items by position
     final grouped = <String, List<FgeItem>>{};
     for (final item in section.items) {
       grouped.putIfAbsent(item.position, () => []).add(item);
     }
-
     if (section.items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(16),
-        child: Text(
-          'No items listed',
-          style: TextStyle(
-              color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic),
-        ),
+        child: Text('No items listed',
+            style: TextStyle(
+                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -617,27 +558,20 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Position header
                   Container(
                     width: double.infinity,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: const BoxDecoration(
                       color: AppColors.black,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(8)),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                     ),
-                    child: Text(
-                      entry.key.toUpperCase().replaceAll('_', ' '),
-                      style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: Text(entry.key.toUpperCase().replaceAll('_', ' '),
+                        style: const TextStyle(
+                            color: AppColors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5)),
                   ),
-                  // Items
                   Padding(
                     padding: const EdgeInsets.all(10),
                     child: Column(
@@ -662,7 +596,6 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
   }
 }
 
-/// A single shelf widget for standard shelved layout.
 class _ShelfWidget extends StatelessWidget {
   final FgeShelf shelf;
   const _ShelfWidget({required this.shelf});
@@ -678,7 +611,6 @@ class _ShelfWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Shelf header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -688,41 +620,29 @@ class _ShelfWidget extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.horizontal_rule,
-                    color: AppColors.white, size: 12),
+                const Icon(Icons.horizontal_rule, color: AppColors.white, size: 12),
                 const SizedBox(width: 6),
-                Text(
-                  'SHELF ${shelf.level}',
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                Text('SHELF ${shelf.level}',
+                    style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5)),
                 const Spacer(),
-                Text(
-                  '${shelf.items.length} item${shelf.items.length == 1 ? '' : 's'}',
-                  style: TextStyle(
-                    color: AppColors.white.withValues(alpha: 0.6),
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('${shelf.items.length} item${shelf.items.length == 1 ? '' : 's'}',
+                    style: TextStyle(
+                        color: AppColors.white.withValues(alpha: 0.6),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-          // Items
           if (shelf.items.isEmpty)
             const Padding(
               padding: EdgeInsets.all(12),
-              child: Text(
-                'Empty shelf',
-                style: TextStyle(
-                    color: AppColors.grey,
-                    fontSize: 11,
-                    fontStyle: FontStyle.italic),
-              ),
+              child: Text('Empty shelf',
+                  style: TextStyle(
+                      color: AppColors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
             )
           else
             Padding(
@@ -746,7 +666,6 @@ class _ShelfWidget extends StatelessWidget {
   }
 }
 
-/// A single product item row with status alerts.
 class _ItemRow extends StatelessWidget {
   final FgeItem item;
   const _ItemRow({required this.item});
@@ -756,7 +675,6 @@ class _ItemRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Status indicator
         if (item.status != ItemStatus.normal)
           Padding(
             padding: const EdgeInsets.only(right: 8, top: 2),
@@ -773,18 +691,13 @@ class _ItemRow extends StatelessWidget {
                       : Colors.blue.withValues(alpha: 0.4),
                 ),
               ),
-              child: Text(
-                item.isRemoved ? 'RMV' : 'ADD',
-                style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w900,
-                  color: item.isRemoved ? Colors.red[800] : Colors.blue[800],
-                ),
-              ),
+              child: Text(item.isRemoved ? 'RMV' : 'ADD',
+                  style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                      color: item.isRemoved ? Colors.red[800] : Colors.blue[800])),
             ),
           ),
-
-        // Position indicator (for vertical_bulk / side_stack)
         if (item.position != 'default')
           Container(
             margin: const EdgeInsets.only(right: 8),
@@ -793,31 +706,20 @@ class _ItemRow extends StatelessWidget {
               color: AppColors.black.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: Text(
-              _shortPosition(item.position),
-              style: const TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-                color: AppColors.grey,
-              ),
-            ),
+            child: Text(_shortPosition(item.position),
+                style: const TextStyle(
+                    fontSize: 8, fontWeight: FontWeight.w900, color: AppColors.grey)),
           ),
-
-        // Product info
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                item.name.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: item.isRemoved ? Colors.red[700] : AppColors.black,
-                  decoration:
-                      item.isRemoved ? TextDecoration.lineThrough : null,
-                ),
-              ),
+              Text(item.name.toUpperCase(),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: item.isRemoved ? Colors.red[700] : AppColors.black,
+                      decoration: item.isRemoved ? TextDecoration.lineThrough : null)),
               const SizedBox(height: 4),
               _RefChip(ref: item.ref),
             ],
@@ -829,25 +731,18 @@ class _ItemRow extends StatelessWidget {
 
   String _shortPosition(String pos) {
     switch (pos.toLowerCase()) {
-      case 'top':
-        return 'TOP';
-      case 'middle':
-        return 'MID';
-      case 'bottom':
-        return 'BTM';
+      case 'top': return 'TOP';
+      case 'middle': return 'MID';
+      case 'bottom': return 'BTM';
       case 'left_vertical':
-      case 'left_stack':
-        return 'L';
+      case 'left_stack': return 'L';
       case 'right_vertical':
-      case 'right_stack':
-        return 'R';
-      default:
-        return pos.substring(0, 1).toUpperCase();
+      case 'right_stack': return 'R';
+      default: return pos.substring(0, 1).toUpperCase();
     }
   }
 }
 
-/// Tappable ref number chip that copies to clipboard.
 class _RefChip extends StatelessWidget {
   final String ref;
   const _RefChip({required this.ref});
@@ -875,21 +770,17 @@ class _RefChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           border: Border.all(color: AppColors.grey.withValues(alpha: 0.2)),
         ),
-        child: Text(
-          ref,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            color: AppColors.black,
-            letterSpacing: 0.5,
-          ),
-        ),
+        child: Text(ref,
+            style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                color: AppColors.black,
+                letterSpacing: 0.5)),
       ),
     );
   }
 }
 
-/// Small stat chip for the header bar.
 class _StatChip extends StatelessWidget {
   final String label;
   const _StatChip({required this.label});
@@ -902,19 +793,13 @@ class _StatChip extends StatelessWidget {
         color: AppColors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: AppColors.white,
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
+      child: Text(label,
+          style: const TextStyle(
+              color: AppColors.white, fontSize: 9, fontWeight: FontWeight.bold)),
     );
   }
 }
 
-/// Alert chip for ADDED/REMOVED indicators.
 class _AlertChip extends StatelessWidget {
   final String label;
   final Color color;
@@ -929,14 +814,9 @@ class _AlertChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
         border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 8,
-          fontWeight: FontWeight.w900,
-          color: color,
-        ),
-      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 8, fontWeight: FontWeight.w900, color: color)),
     );
   }
 }

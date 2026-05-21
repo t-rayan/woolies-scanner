@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/models/fge_model.dart';
 import '../../core/services/fge_parser.dart';
 
@@ -16,7 +16,8 @@ final fgeSearchQueryProvider = StateProvider<String>((ref) => '');
 
 /// Async state for FGE planogram data
 final fgePlanogramProvider =
-    StateNotifierProvider<FgePlanogramNotifier, AsyncValue<FgePlanogram?>>((ref) {
+    StateNotifierProvider<FgePlanogramNotifier, AsyncValue<FgePlanogram?>>(
+        (ref) {
   return FgePlanogramNotifier(ref);
 });
 
@@ -44,8 +45,7 @@ class FgePlanogramNotifier extends StateNotifier<AsyncValue<FgePlanogram?>> {
 
   FgePlanogramNotifier(this._ref) : super(const AsyncValue.data(null));
 
-  /// Process an FGE sheet image
-  Future<void> processImage(File image) async {
+  Future<void> processImage(XFile image) async {
     state = const AsyncValue.loading();
 
     final parser = _ref.read(fgeParserProvider);

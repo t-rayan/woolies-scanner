@@ -6,7 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/product_model.dart';
-import '../../core/services/local_product_database.dart';
+
+import '../../core/services/supabase_service.dart';
 import '../../features/home/home_screen.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
@@ -96,7 +97,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
 
     if (confirmed == true) {
       await ref
-          .read(localProductDatabaseProvider)
+          .read(supabaseServiceProvider)
           .deleteByDateAndSheet(date, summary.sheetName);
       ref.invalidate(planogramDatesProvider);
       ref.invalidate(totalDatabaseItemsProvider);

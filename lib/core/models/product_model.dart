@@ -33,7 +33,6 @@ class Product {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'name': name,
       'brand': brand,
       'weight': weight,
@@ -45,7 +44,8 @@ class Product {
       'sheet_name': sheetName,
       'image_path': imagePath,
       'quantity': quantity,
-      'scanned_at': scanDate?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'scanned_at':
+          scanDate?.toIso8601String() ?? DateTime.now().toIso8601String(),
     };
   }
 
@@ -63,10 +63,13 @@ class Product {
       sheetName: map['sheet_name'],
       imagePath: map['image_path'],
       quantity: map['quantity'] ?? 1,
-      scanDate: map['scanned_at'] != null ? DateTime.tryParse(map['scanned_at']) : null,
+      scanDate: map['scanned_at'] != null
+          ? DateTime.tryParse(map['scanned_at'])
+          : null,
     );
   }
 
   String toJson() => json.encode(toMap());
-  factory Product.fromJson(String source) => Product.fromMap(json.decode(source));
+  factory Product.fromJson(String source) =>
+      Product.fromMap(json.decode(source));
 }

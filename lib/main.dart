@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 
 import 'features/home/home_screen.dart';
 import 'features/products/product_list_screen.dart';
-import 'features/products/product_provider.dart';
 import 'features/scanner/scanner_screen.dart';
 import 'core/constants/app_colors.dart';
+import 'core/services/supabase_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,30 +18,18 @@ Future<void> main() async {
     debugPrint('Warning: Could not load .env file: $e');
   }
 
+  // Initialize Supabase
+  try {
+    await SupabaseService.instance.initialize();
+  } catch (e) {
+    debugPrint('Warning: Could not initialize Supabase: $e');
+  }
+
   runApp(
     ProviderScope(
-      child: _EntFixGate(child: const WooliesApp()),
+      child: const WooliesApp(),
     ),
   );
-}
-
-/// Runs the ENT data fix on startup before showing the app.
-class _EntFixGate extends ConsumerWidget {
-  final Widget child;
-  const _EntFixGate({required this.child});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final fixAsync = ref.watch(fixEntDataProvider);
-    return fixAsync.when(
-      data: (_) => child,
-      loading: () => const MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(body: Center(child: CircularProgressIndicator())),
-      ),
-      error: (_, __) => child,
-    );
-  }
 }
 
 final _router = GoRouter(
