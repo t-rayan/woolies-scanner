@@ -5,17 +5,43 @@ import 'package:go_router/go_router.dart';
 
 import 'features/home/home_screen.dart';
 import 'features/products/product_list_screen.dart';
+import 'features/products/product_provider.dart';
 import 'features/scanner/scanner_screen.dart';
 import 'core/constants/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+
+  try {
+    await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 3));
+  } catch (e) {
+    debugPrint('Warning: Could not load .env file: $e');
+  }
+
   runApp(
-    const ProviderScope(
-      child: WooliesApp(),
+    ProviderScope(
+      child: _EntFixGate(child: const WooliesApp()),
     ),
   );
+}
+
+/// Runs the ENT data fix on startup before showing the app.
+class _EntFixGate extends ConsumerWidget {
+  final Widget child;
+  const _EntFixGate({required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fixAsync = ref.watch(fixEntDataProvider);
+    return fixAsync.when(
+      data: (_) => child,
+      loading: () => const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      ),
+      error: (_, __) => child,
+    );
+  }
 }
 
 final _router = GoRouter(
@@ -23,8 +49,10 @@ final _router = GoRouter(
   redirect: (context, state) {
     if (state.uri.path == '/scanner') {
       final apiKey = dotenv.env['ANTHROPIC_API_KEY'];
+      // If .env failed to load, we still allow the screen to open
+      // but the ClaudeService will handle the missing key error gracefully
       if (apiKey == null || apiKey.trim().isEmpty) {
-        return '/error?code=missing_api_key';
+        debugPrint('Warning: ANTHROPIC_API_KEY is not set in .env');
       }
     }
     return null;
@@ -45,6 +73,7 @@ final _router = GoRouter(
       path: '/database',
       builder: (context, state) => ProductListScreen(
         date: state.uri.queryParameters['date'],
+        sheet: state.uri.queryParameters['sheet'],
       ),
     ),
     GoRoute(
@@ -87,7 +116,8 @@ class WooliesApp extends StatelessWidget {
             backgroundColor: AppColors.black,
             foregroundColor: AppColors.white,
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
       ),

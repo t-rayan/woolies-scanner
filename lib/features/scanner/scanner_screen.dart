@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-import '../../core/constants/app_colors.dart';
 import '../../core/models/product_model.dart';
 import '../../core/services/claude_service.dart';
-import '../../core/services/local_product_database.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
 
@@ -21,119 +21,234 @@ class ScannerScreen extends ConsumerStatefulWidget {
 class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   bool _isProcessing = false;
   String? _statusMessage;
-  File? _selectedFile;
+  String? _errorMessage;
+  final ImagePicker _picker = ImagePicker();
 
-  Future<void> _pickAndProcessFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
-    );
-
-    if (result == null || result.files.single.path == null) return;
-
-    setState(() {
-      _selectedFile = File(result.files.single.path!);
-      _isProcessing = true;
-      _statusMessage = 'Analyzing planogram...';
-    });
-
+  Future<void> _pickAndProcessImage({required ImageSource source}) async {
     try {
-      final apiKey = 'sk-ant-api03-...'; // In a real app, this would be from .env
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 95,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isProcessing = true;
+        _statusMessage = 'Processing image...';
+        _errorMessage = null;
+      });
+
+      final String apiKey = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+      if (apiKey.isEmpty) throw Exception('API Key missing from .env');
+
       final claudeService = ClaudeService(apiKey);
-      
-      final results = await claudeService.analyzeImage(_selectedFile!);
-      
-      setState(() => _statusMessage = 'Saving to database...');
 
-      // Correctly convert Map results to Product objects
-      final List<Product> scannedProducts = results.map((r) => Product.fromMap(r)).toList();
-      
-      if (scannedProducts.isNotEmpty) {
-        await ref.read(localProductDatabaseProvider).insertProducts(scannedProducts);
-        
-        // Refresh all relevant providers
-        ref.invalidate(planogramDatesProvider);
-        ref.invalidate(totalDatabaseItemsProvider);
-        ref.invalidate(groupedProductsProvider);
-        
-        setState(() {
-          _isProcessing = false;
-          _statusMessage = 'Success! ${scannedProducts.length} items added.';
-        });
+      // Image preprocessing happens inside analyzeImage (EXIF + resize to 2576px)
+      setState(() => _statusMessage = 'Analyzing sheet...');
+      final results = await claudeService.analyzeImage(File(image.path));
 
-        if (mounted) {
-          Future.delayed(const Duration(seconds: 1), () => context.pop());
+      if (results.isEmpty) {
+        throw Exception(
+            'AI could not detect any products. Please ensure the image is clear and well-lit.');
+      }
+
+      final String today = DateFormat('dd/MM/yyyy').format(DateTime.now());
+
+      // Collect all dates to check for duplicates
+      final datesFound = <String>{};
+
+      final List<Product> scannedProducts = results.map<Product>((r) {
+        final aisleStr =
+            (r['aisle'] ?? 'GENERAL').toString().toUpperCase().trim();
+        String planogramDate = (r['planogram_date'] ?? today).toString().trim();
+        if (planogramDate.length < 5) planogramDate = today;
+
+        // --- ROUTING RULES ---
+        // OGE: ONLY OGE001-OGE012
+        // FGE: Everything else — FGE boxes, ENT, POS, BIN, Front of Store
+        String sheetName = 'OGE';
+        if (aisleStr.startsWith('FGE') ||
+            aisleStr.startsWith('ENT') ||
+            aisleStr.startsWith('POS') ||
+            aisleStr.startsWith('BIN') ||
+            aisleStr.startsWith('FRONT OF STORE') ||
+            aisleStr.contains('FLEXI')) {
+          sheetName = 'FGE';
         }
-      } else {
-        setState(() {
-          _isProcessing = false;
-          _statusMessage = 'No products found in sheet.';
-        });
+
+        datesFound.add(planogramDate);
+
+        return Product(
+          name: r['name'] ?? 'Unknown Product',
+          barcode: r['barcode'],
+          aisle: aisleStr,
+          planogramDate: planogramDate,
+          sheetName: sheetName,
+          scanDate: DateTime.now(),
+        );
+      }).toList();
+
+      // Check if the date folder already exists (consolidation)
+      final existingDates =
+          await ref.read(localProductDatabaseProvider).fetchUniqueDates();
+      final bool isNewDate = scannedProducts.isEmpty ||
+          scannedProducts
+              .every((p) => !existingDates.contains(p.planogramDate));
+
+      setState(
+          () => _statusMessage = 'Saving ${scannedProducts.length} items...');
+
+      await ref
+          .read(localProductDatabaseProvider)
+          .insertProducts(scannedProducts);
+
+      // Force immediate recomputation so home screen shows updated data on pop.
+      ref.invalidate(planogramDatesProvider);
+      ref.invalidate(totalDatabaseItemsProvider);
+      ref.invalidate(groupedProductsBySheetProvider);
+      // Eagerly re-read to flush stale cache before navigation.
+      await ref.read(planogramDatesProvider.future);
+      await ref.read(totalDatabaseItemsProvider.future);
+
+      if (mounted) {
+        final msg = isNewDate
+            ? 'SAVED ${scannedProducts.length} ITEMS'
+            : 'APPENDED ${scannedProducts.length} ITEMS TO EXISTING FOLDER';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.pop();
       }
     } catch (e) {
-      debugPrint('Scan Error: $e');
-      setState(() {
-        _isProcessing = false;
-        _statusMessage = 'Error: ${e.toString()}';
-      });
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _statusMessage = null;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('SCAN SHEET', style: TextStyle(color: AppColors.black, fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.white,
+        title: const Text('NEW SCAN',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: AppColors.black),
-          onPressed: () => context.pop(),
-        ),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_isProcessing) ...[
-                const CircularProgressIndicator(color: AppColors.black),
-                const SizedBox(height: 24),
-                Text(_statusMessage ?? 'Processing...', 
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              ] else ...[
-                const Icon(Icons.upload_file_outlined, size: 80, color: AppColors.lightGrey),
-                const SizedBox(height: 32),
-                const Text(
-                  'Upload Planogram Sheet',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Center(
+          child: _isProcessing
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: Colors.black),
+                    const SizedBox(height: 24),
+                    Text(_statusMessage ?? 'Processing...',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_errorMessage != null) ...[
+                      const Icon(Icons.error_outline_rounded,
+                          size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text(
+                        'SCAN FAILED',
+                        style: TextStyle(
+                            color: Colors.red[900],
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _errorMessage!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 32),
+                    ] else ...[
+                      const Icon(Icons.document_scanner_rounded,
+                          size: 100, color: Colors.grey),
+                      const SizedBox(height: 32),
+                      const Text(
+                        'Upload Promo Sheet',
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Select a photo of your OGE or FGE sheet to extract details.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                      const SizedBox(height: 48),
+                    ],
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => _pickAndProcessImage(
+                                  source: ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt_rounded),
+                              label: const Text('CAMERA',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 20),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            ElevatedButton.icon(
+                              onPressed: () => _pickAndProcessImage(
+                                  source: ImageSource.gallery),
+                              icon: const Icon(Icons.photo_library_rounded),
+                              label: Text(
+                                  _errorMessage != null
+                                      ? 'TRY AGAIN'
+                                      : 'GALLERY',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.black,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 20),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Select a photo or PDF of the OGE/FGE sheet to extract all products.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.grey),
-                ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: _pickAndProcessFile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('SELECT FILE', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.bold)),
-                ),
-                if (_statusMessage != null) ...[
-                  const SizedBox(height: 24),
-                  Text(_statusMessage!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                ],
-              ],
-            ],
-          ),
         ),
       ),
     );
