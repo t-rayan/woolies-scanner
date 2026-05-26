@@ -26,5 +26,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - .env
+  # .env is NOT listed here because it doesn't exist in CI builds.
+  # Android reads it from the filesystem via flutter_dotenv at runtime.
