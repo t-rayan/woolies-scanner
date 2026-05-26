@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -234,7 +235,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           context
               .push('/database?date=$encodedDate&sheet=${summary.sheetName}');
         },
-        onLongPress: () => _deleteSheetCategory(date, summary),
+        onLongPress: kIsWeb ? null : () => _deleteSheetCategory(date, summary),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.white,
