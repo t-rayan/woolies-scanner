@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,41 +20,53 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ============================================================
-  // Read Supabase credentials from compile-time --dart-define
-  // (set in .github/workflows/firebase-hosting-merge.yml)
+  // Read Supabase credentials from two possible sources:
+  //   1. Compile-time --dart-define (used by Firebase CI builds + local web)
+  //   2. .env file via dotenv (used for local Android/iOS development)
   // ============================================================
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  _consoleLog('--- Supabase Credentials Check ---');
-  _consoleLog(
-      'SUPABASE_URL  => "${supabaseUrl.isEmpty ? '(EMPTY!)' : supabaseUrl}"');
-  _consoleLog(
-      'SUPABASE_ANON_KEY => "${supabaseAnonKey.isEmpty ? '(EMPTY!)' : '${supabaseAnonKey.substring(0, 20)}...'}"');
+  // 1st priority: --dart-define compile-time constant (always available on web)
+  const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
+  const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    _consoleLog('❌ CRITICAL: One or both --dart-define variables are EMPTY!');
-    _consoleLog(
-        '   Check that the GitHub Secret names match the --dart-define names.');
+  // 2nd priority: .env file fallback — skip on web (no filesystem, causes hang)
+  String? envUrl;
+  String? envKey;
 
-    // ════════════════════════════════════════════════
-    // 🔥 MOST LIKELY CAUSE:
-    //   The GitHub Action workflow file defines:
-    //     --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}
-    //   but the secret name in GitHub might be different, OR
-    //   the values may contain special characters that need quoting.
-    // ════════════════════════════════════════════════
+  if (!kIsWeb) {
+    try {
+      await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 1));
+      envUrl = dotenv.env['SUPABASE_URL'];
+      envKey = dotenv.env['SUPABASE_ANON_KEY'];
+    } catch (_) {
+      _consoleLog('.env not loaded — using --dart-define (CI build)');
+    }
   }
 
-  // Initialize Supabase (pass credentials directly — no dotenv)
-  try {
-    await SupabaseService.instance.initialize(
-      supabaseUrl: supabaseUrl,
-      supabaseAnonKey: supabaseAnonKey,
-    );
-  } catch (e) {
-    _consoleLog('❌ Supabase initialize threw: $e');
-    _consoleLog('   Stack trace:\n${StackTrace.current}');
+  // Pick whichever is available
+  final supabaseUrl = dartDefineUrl.isNotEmpty ? dartDefineUrl : (envUrl ?? '');
+  final supabaseAnonKey =
+      dartDefineKey.isNotEmpty ? dartDefineKey : (envKey ?? '');
+
+  _consoleLog('--- Supabase Credentials ---');
+  _consoleLog(
+      'Source: ${dartDefineUrl.isNotEmpty ? "--dart-define" : (envUrl != null ? ".env" : "NONE")}');
+  _consoleLog(supabaseUrl.isEmpty ? 'URL: (EMPTY!)' : 'URL: $supabaseUrl');
+  _consoleLog(supabaseAnonKey.isEmpty
+      ? 'KEY: (EMPTY!)'
+      : 'KEY: ${supabaseAnonKey.substring(0, 20)}...');
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    _consoleLog('❌ Credentials EMPTY — Supabase features unavailable');
+  } else {
+    try {
+      await SupabaseService.instance.initialize(
+        supabaseUrl: supabaseUrl,
+        supabaseAnonKey: supabaseAnonKey,
+      );
+    } catch (e) {
+      _consoleLog('❌ Supabase init failed: $e');
+    }
   }
 
   runApp(
