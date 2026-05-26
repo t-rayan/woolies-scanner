@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product_model.dart';
 import 'package:intl/intl.dart';
@@ -20,30 +19,35 @@ class SupabaseService {
   }
 
   /// Must be called once before any DB operations (e.g. in main()).
-  Future<void> initialize() async {
+  ///
+  /// [supabaseUrl] and [supabaseAnonKey] are now passed explicitly.
+  /// In production, the caller should use `const String.fromEnvironment()`
+  /// (injected via `--dart-define` in the CI build).
+  Future<void> initialize({
+    String supabaseUrl = '',
+    String supabaseAnonKey = '',
+  }) async {
     if (_initialized) return;
 
-    final supabaseUrl = dotenv.env['SUPABASE_URL'];
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'];
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      debugPrint(
+        '⚠️ Supabase credentials missing (url empty=${supabaseUrl.isEmpty}, '
+        'key empty=${supabaseAnonKey.isEmpty}) — DB features unavailable.',
+      );
+      return;
+    }
 
-    if (supabaseUrl == null || supabaseUrl.isEmpty) {
-      debugPrint(
-          '⚠️ SUPABASE_URL not set — some features will be unavailable.');
-    }
-    if (supabaseAnonKey == null || supabaseAnonKey.isEmpty) {
-      debugPrint(
-          '⚠️ SUPABASE_ANON_KEY not set — some features will be unavailable.');
-    }
+    debugPrint('🔌 Initializing Supabase with URL: $supabaseUrl');
 
     await Supabase.initialize(
-      url: supabaseUrl ?? '',
-      anonKey: supabaseAnonKey ?? '',
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
       debug: kDebugMode,
     );
 
     _client = Supabase.instance.client;
     _initialized = true;
-    debugPrint('✅ Supabase initialized');
+    debugPrint('✅ Supabase initialized successfully');
   }
 
   SupabaseClient get client {
