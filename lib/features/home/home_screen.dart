@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -204,14 +205,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
             loading: () => const Center(
                 child: CircularProgressIndicator(color: AppColors.black)),
-            error: (_, __) =>
-                const Center(child: Text('Error loading collections')),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline,
+                        size: 48, color: AppColors.grey),
+                    const SizedBox(height: 12),
+                    Text('$e',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: AppColors.grey, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
           );
         },
         loading: () => const Center(
             child: CircularProgressIndicator(color: AppColors.black)),
-        error: (_, __) =>
-            const Center(child: Text('Database connection error')),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off_rounded,
+                    size: 64, color: AppColors.grey),
+                const SizedBox(height: 16),
+                const Text('DATABASE ERROR',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.black)),
+                const SizedBox(height: 8),
+                Text(
+                  '$e',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.invalidate(totalDatabaseItemsProvider);
+                    ref.invalidate(planogramDatesProvider);
+                  },
+                  child: const Text('RETRY'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
