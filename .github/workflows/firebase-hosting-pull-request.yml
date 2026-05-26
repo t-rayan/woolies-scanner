@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: flutter pub get
+      - name: Create dummy .env for asset bundler
+        run: echo 'SUPABASE_URL=dummy' > .env
       - name: Build Flutter Web
         run: |
           flutter build web --release \

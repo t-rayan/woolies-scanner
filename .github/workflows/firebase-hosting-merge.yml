@@ -23,6 +23,10 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # Create dummy .env so asset bundler doesn't fail (real creds come from --dart-define)
+      - name: Create dummy .env for asset bundler
+        run: echo 'SUPABASE_URL=dummy' > .env
+
       - name: Build Flutter Web
         run: |
           flutter build web --release \
