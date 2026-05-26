@@ -4,6 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product_model.dart';
 import 'package:intl/intl.dart';
 
+/// Always-visible console logger (works on web + native).
+void _dbLog(Object? message) {
+  // ignore: avoid_print
+  print('[SUPABASE] $message');
+}
+
 /// Wraps Supabase client and provides all CRUD operations
 /// previously handled by sqflite's LocalProductDatabase.
 class SupabaseService {
@@ -109,6 +115,20 @@ class SupabaseService {
     return 'OGE';
   }
 
+  /// Helper: log a database error with full context.
+  void _logError(String operation, Object error) {
+    _dbLog('❌ $operation failed: $error');
+    if (error is PostgrestException) {
+      _dbLog('   Code: ${error.code}');
+      _dbLog('   Message: ${error.message}');
+      _dbLog('   Details: ${error.details}');
+      _dbLog('   Hint: ${error.hint}');
+    }
+  }
+
+  /// Check that the client is ready — returns false if not initialized.
+  bool get isReady => _initialized;
+
   // ------- CRUD Operations -------
 
   Future<void> insertProducts(List<Product> products) async {
@@ -122,142 +142,170 @@ class SupabaseService {
       return map;
     }).toList();
 
-    await client.from('scanned_products').insert(payload);
+    try {
+      await client.from('scanned_products').insert(payload);
+    } catch (e) {
+      _logError('insertProducts', e);
+      rethrow;
+    }
   }
 
   Future<List<String>> fetchUniqueDates() async {
-    final response = await client
-        .from('scanned_products')
-        .select('planogram_date')
-        .order('planogram_date', ascending: false);
+    try {
+      final response = await client
+          .from('scanned_products')
+          .select('planogram_date')
+          .order('planogram_date', ascending: false);
 
-    final dates = <String>{};
-    for (final row in response) {
-      final d = row['planogram_date'] as String?;
-      if (d != null && d.isNotEmpty) dates.add(d);
+      final dates = <String>{};
+      for (final row in response) {
+        final d = row['planogram_date'] as String?;
+        if (d != null && d.isNotEmpty) dates.add(d);
+      }
+      return dates.toList();
+    } catch (e) {
+      _logError('fetchUniqueDates', e);
+      return [];
     }
-    return dates.toList();
   }
 
   Future<List<String>> fetchUniqueSheetsForDate(String date) async {
-    final cleanDate = normalizeDate(date);
-    final response = await client
-        .from('scanned_products')
-        .select('sheet_name')
-        .eq('planogram_date', cleanDate);
+    try {
+      final cleanDate = normalizeDate(date);
+      final response = await client
+          .from('scanned_products')
+          .select('sheet_name')
+          .eq('planogram_date', cleanDate);
 
-    final sheets = <String>{};
-    for (final row in response) {
-      final s = row['sheet_name'] as String?;
-      if (s != null && s.isNotEmpty) sheets.add(s);
+      final sheets = <String>{};
+      for (final row in response) {
+        final s = row['sheet_name'] as String?;
+        if (s != null && s.isNotEmpty) sheets.add(s);
+      }
+      return sheets.toList();
+    } catch (e) {
+      _logError('fetchUniqueSheetsForDate', e);
+      return [];
     }
-    return sheets.toList();
   }
 
   Future<List<AisleProductGroup>> fetchGroupedByAisle(
       String date, String sheet) async {
-    final cleanDate = normalizeDate(date);
-    final cleanSheet = sheet.toUpperCase().trim();
+    try {
+      final cleanDate = normalizeDate(date);
+      final cleanSheet = sheet.toUpperCase().trim();
 
-    var query = client
-        .from('scanned_products')
-        .select()
-        .eq('planogram_date', cleanDate);
-
-    // For OGE, filter out ENT/POS/BIN products
-    if (cleanSheet == 'OGE') {
-      query = query
-          .or(
-            'sheet_name.eq.$cleanSheet,'
-            'aisle.is.null,'
-            'aisle.not.like.ENT%,'
-            'aisle.not.like.POS%,'
-            'aisle.not.like.BIN%,'
-            'aisle.not.like.FRONT OF STORE%,'
-            'aisle.not.like.FLEXI%',
-          )
+      var query = client
+          .from('scanned_products')
+          .select()
           .eq('planogram_date', cleanDate);
-    } else {
-      query = query.eq('sheet_name', cleanSheet);
+
+      if (cleanSheet == 'OGE') {
+        query = query
+            .or(
+              'sheet_name.eq.$cleanSheet,'
+              'aisle.is.null,'
+              'aisle.not.like.ENT%,'
+              'aisle.not.like.POS%,'
+              'aisle.not.like.BIN%,'
+              'aisle.not.like.FRONT OF STORE%,'
+              'aisle.not.like.FLEXI%',
+            )
+            .eq('planogram_date', cleanDate);
+      } else {
+        query = query.eq('sheet_name', cleanSheet);
+      }
+
+      final response = await query.order('aisle', ascending: true);
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      final parsed = rows.map((r) => Product.fromMap(r)).toList();
+
+      final Map<String, List<Product>> grouped = {};
+      for (final p in parsed) {
+        final aisle = (p.aisle ?? 'GENERAL').toUpperCase();
+        grouped.putIfAbsent(aisle, () => []).add(p);
+      }
+
+      return grouped.entries
+          .map((e) => AisleProductGroup(aisle: e.key, products: e.value))
+          .toList();
+    } catch (e) {
+      _logError('fetchGroupedByAisle', e);
+      return [];
     }
-
-    final response = await query.order('aisle', ascending: true);
-    final rows = (response as List).cast<Map<String, dynamic>>();
-    final parsed = rows.map((r) => Product.fromMap(r)).toList();
-
-    final Map<String, List<Product>> grouped = {};
-    for (final p in parsed) {
-      final aisle = (p.aisle ?? 'GENERAL').toUpperCase();
-      grouped.putIfAbsent(aisle, () => []).add(p);
-    }
-
-    return grouped.entries
-        .map((e) => AisleProductGroup(aisle: e.key, products: e.value))
-        .toList();
   }
 
   Future<List<Product>> searchProducts(String query) async {
-    final searchTerm = '%$query%';
-    final response = await client
-        .from('scanned_products')
-        .select()
-        .or(
-          'name.ilike.$searchTerm,'
-          'barcode.ilike.$searchTerm,'
-          'aisle.ilike.$searchTerm,'
-          'sheet_name.ilike.$searchTerm',
-        )
-        .order('name', ascending: true);
+    try {
+      final searchTerm = '%$query%';
+      final response = await client
+          .from('scanned_products')
+          .select()
+          .or(
+            'name.ilike.$searchTerm,'
+            'barcode.ilike.$searchTerm,'
+            'aisle.ilike.$searchTerm,'
+            'sheet_name.ilike.$searchTerm',
+          )
+          .order('name', ascending: true);
 
-    final rows = (response as List).cast<Map<String, dynamic>>();
-    return rows.map((r) => Product.fromMap(r)).toList();
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      return rows.map((r) => Product.fromMap(r)).toList();
+    } catch (e) {
+      _logError('searchProducts', e);
+      return [];
+    }
   }
 
   Future<int> fetchTotalCount() async {
-    final rows = await client.from('scanned_products').select('id');
-    return rows.length;
+    try {
+      final rows = await client.from('scanned_products').select('id');
+      return rows.length;
+    } catch (e) {
+      _logError('fetchTotalCount', e);
+      return 0;
+    }
   }
 
   Future<List<SheetCategorySummary>> fetchGroupedCountsByDate(
       String date) async {
-    final cleanDate = normalizeDate(date);
+    try {
+      final cleanDate = normalizeDate(date);
 
-    // Count OGE products
+      final ogeRows = await client
+          .from('scanned_products')
+          .select('id')
+          .eq('planogram_date', cleanDate)
+          .eq('sheet_name', 'OGE');
+      final ogeCount = ogeRows.length;
 
-    final ogeRows = await client
-        .from('scanned_products')
-        .select('id')
-        .eq('planogram_date', cleanDate)
-        .eq('sheet_name', 'OGE');
+      final fgeRows = await client
+          .from('scanned_products')
+          .select('id')
+          .eq('planogram_date', cleanDate)
+          .eq('sheet_name', 'FGE');
+      final fgeCount = fgeRows.length;
 
-    final ogeCount = ogeRows.length;
-
-    // Count FGE products
-
-    final fgeRows = await client
-        .from('scanned_products')
-        .select('id')
-        .eq('planogram_date', cleanDate)
-        .eq('sheet_name', 'FGE');
-
-    final fgeCount = fgeRows.length;
-
-    final summaries = <SheetCategorySummary>[];
-    if (ogeCount > 0) {
-      summaries.add(SheetCategorySummary(
-        sheetName: 'OGE',
-        displayLabel: 'OGE - Back Ends',
-        productCount: ogeCount,
-      ));
+      final summaries = <SheetCategorySummary>[];
+      if (ogeCount > 0) {
+        summaries.add(SheetCategorySummary(
+          sheetName: 'OGE',
+          displayLabel: 'OGE - Back Ends',
+          productCount: ogeCount,
+        ));
+      }
+      if (fgeCount > 0) {
+        summaries.add(SheetCategorySummary(
+          sheetName: 'FGE',
+          displayLabel: 'FGE - Front & Entrance',
+          productCount: fgeCount,
+        ));
+      }
+      return summaries;
+    } catch (e) {
+      _logError('fetchGroupedCountsByDate', e);
+      return [];
     }
-    if (fgeCount > 0) {
-      summaries.add(SheetCategorySummary(
-        sheetName: 'FGE',
-        displayLabel: 'FGE - Front & Entrance',
-        productCount: fgeCount,
-      ));
-    }
-    return summaries;
   }
 
   Future<void> deleteByDate(String date) async {

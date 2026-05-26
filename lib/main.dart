@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,20 +9,51 @@ import 'features/scanner/scanner_screen.dart';
 import 'core/constants/app_colors.dart';
 import 'core/services/supabase_service.dart';
 
+/// Logs a message to the browser console so you can see it live in devtools.
+void _consoleLog(Object? message) {
+  // ignore: avoid_print
+  print('[WOOLIES] $message');
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 3));
-  } catch (e) {
-    debugPrint('Warning: Could not load .env file: $e');
+  // ============================================================
+  // Read Supabase credentials from compile-time --dart-define
+  // (set in .github/workflows/firebase-hosting-merge.yml)
+  // ============================================================
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  _consoleLog('--- Supabase Credentials Check ---');
+  _consoleLog(
+      'SUPABASE_URL  => "${supabaseUrl.isEmpty ? '(EMPTY!)' : supabaseUrl}"');
+  _consoleLog(
+      'SUPABASE_ANON_KEY => "${supabaseAnonKey.isEmpty ? '(EMPTY!)' : '${supabaseAnonKey.substring(0, 20)}...'}"');
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    _consoleLog('❌ CRITICAL: One or both --dart-define variables are EMPTY!');
+    _consoleLog(
+        '   Check that the GitHub Secret names match the --dart-define names.');
+
+    // ════════════════════════════════════════════════
+    // 🔥 MOST LIKELY CAUSE:
+    //   The GitHub Action workflow file defines:
+    //     --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+    //   but the secret name in GitHub might be different, OR
+    //   the values may contain special characters that need quoting.
+    // ════════════════════════════════════════════════
   }
 
-  // Initialize Supabase
+  // Initialize Supabase (pass credentials directly — no dotenv)
   try {
-    await SupabaseService.instance.initialize();
+    await SupabaseService.instance.initialize(
+      supabaseUrl: supabaseUrl,
+      supabaseAnonKey: supabaseAnonKey,
+    );
   } catch (e) {
-    debugPrint('Warning: Could not initialize Supabase: $e');
+    _consoleLog('❌ Supabase initialize threw: $e');
+    _consoleLog('   Stack trace:\n${StackTrace.current}');
   }
 
   runApp(
@@ -35,14 +66,8 @@ Future<void> main() async {
 final _router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
-    if (state.uri.path == '/scanner') {
-      final apiKey = dotenv.env['ANTHROPIC_API_KEY'];
-      // If .env failed to load, we still allow the screen to open
-      // but the ClaudeService will handle the missing key error gracefully
-      if (apiKey == null || apiKey.trim().isEmpty) {
-        debugPrint('Warning: ANTHROPIC_API_KEY is not set in .env');
-      }
-    }
+    // The scanner uses the Anthropic API key — no change needed here for now
+    // since scanning is disabled on web (CORS). For local dev it still uses .env.
     return null;
   },
   errorBuilder: (context, state) => RouterErrorScreen(
