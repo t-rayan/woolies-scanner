@@ -235,7 +235,8 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           context
               .push('/database?date=$encodedDate&sheet=${summary.sheetName}');
         },
-        onLongPress: kIsWeb ? null : () => _deleteSheetCategory(date, summary),
+        // TODO: re-enable long-press delete
+        // onLongPress: kIsWeb ? null : () => _deleteSheetCategory(date, summary),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.white,
