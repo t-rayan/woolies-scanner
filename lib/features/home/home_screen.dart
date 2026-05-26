@@ -259,27 +259,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton(
-            heroTag: 'search',
-            onPressed: _startSearch,
-            backgroundColor: AppColors.black,
-            elevation: 4,
-            mini: true,
-            child: const Icon(Icons.search_rounded, color: AppColors.white),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: 'scan',
-            onPressed: () => context.push('/scanner'),
-            backgroundColor: AppColors.black,
-            elevation: 4,
-            child: const Icon(Icons.qr_code_scanner, color: AppColors.white),
-          ),
-        ],
-      ),
+      floatingActionButton: kIsWeb
+          // Web: only show search (scan doesn't work on web due to CORS)
+          ? FloatingActionButton(
+              heroTag: 'search',
+              onPressed: _startSearch,
+              backgroundColor: AppColors.black,
+              elevation: 4,
+              child: const Icon(Icons.search_rounded, color: AppColors.white),
+            )
+          // Mobile: show both search (mini) + scan FABs
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'search',
+                  onPressed: _startSearch,
+                  backgroundColor: AppColors.black,
+                  elevation: 4,
+                  mini: true,
+                  child:
+                      const Icon(Icons.search_rounded, color: AppColors.white),
+                ),
+                const SizedBox(height: 16),
+                FloatingActionButton(
+                  heroTag: 'scan',
+                  onPressed: () => context.push('/scanner'),
+                  backgroundColor: AppColors.black,
+                  elevation: 4,
+                  child:
+                      const Icon(Icons.qr_code_scanner, color: AppColors.white),
+                ),
+              ],
+            ),
     );
   }
 
