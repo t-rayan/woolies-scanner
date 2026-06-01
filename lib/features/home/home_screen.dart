@@ -454,13 +454,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         fontWeight: FontWeight.w800,
                         color: AppColors.black)),
               ),
-              // TODO: re-enable delete button
-              // if (!kIsWeb)
-              //   IconButton(
-              //     icon: const Icon(Icons.delete_outline_rounded,
-              //         color: AppColors.grey, size: 22),
-              //     onPressed: () => _deleteEntireDate(context, ref, date),
-              //   ),
+              if (!kIsWeb)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: AppColors.grey, size: 22),
+                  onPressed: () => _deleteEntireDate(context, ref, date),
+                ),
               const Icon(Icons.chevron_right_rounded, color: AppColors.grey),
             ],
           ),
