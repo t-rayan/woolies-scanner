@@ -200,21 +200,8 @@ class SupabaseService {
           .select()
           .eq('planogram_date', cleanDate);
 
-      if (cleanSheet == 'OGE') {
-        query = query
-            .or(
-              'sheet_name.eq.$cleanSheet,'
-              'aisle.is.null,'
-              'aisle.not.like.ENT%,'
-              'aisle.not.like.POS%,'
-              'aisle.not.like.BIN%,'
-              'aisle.not.like.FRONT OF STORE%,'
-              'aisle.not.like.FLEXI%',
-            )
-            .eq('planogram_date', cleanDate);
-      } else {
-        query = query.eq('sheet_name', cleanSheet);
-      }
+      // Simple filter by sheet_name — already corrected during insertion
+      query = query.eq('sheet_name', cleanSheet);
 
       final response = await query.order('aisle', ascending: true);
       final rows = (response as List).cast<Map<String, dynamic>>();
