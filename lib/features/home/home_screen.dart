@@ -477,6 +477,13 @@ final groupedCountsProvider =
   return svc.fetchGroupedCountsByDate(date);
 });
 
+/// Ends that don't belong to this store — shown as disabled/grayed out.
+const _disabledEnds = <String>{'FGE011', 'FGE012', 'OGE011', 'OGE012'};
+
+/// Returns true if the aisle ID is a disabled end (not belonging to this store).
+bool _isDisabledEnd(String aisle) =>
+    _disabledEnds.contains(aisle.toUpperCase());
+
 /// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
 class _SearchResultTile extends StatelessWidget {
   final Product product;
@@ -494,12 +501,18 @@ class _SearchResultTile extends StatelessWidget {
     final refs =
         product.barcode?.split(',').map((e) => e.trim()).toList() ?? [];
     final isEnt = displayAisle.startsWith('ENT');
+    final disabled = _isDisabledEnd(displayAisle);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border.all(color: AppColors.lightGrey, width: 1.5),
+        color: disabled ? AppColors.lightGrey : AppColors.white,
+        border: Border.all(
+          color: disabled
+              ? AppColors.grey.withValues(alpha: 0.3)
+              : AppColors.lightGrey,
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -512,11 +525,23 @@ class _SearchResultTile extends StatelessWidget {
                 HighlightedText(
                   text: product.name.toUpperCase(),
                   query: query.toUpperCase(),
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontWeight: FontWeight.w800,
                       fontSize: 14,
-                      color: AppColors.black),
+                      color: disabled ? AppColors.grey : AppColors.black),
                 ),
+                if (disabled)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'This end does not belong to this store',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
                 if (refs.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Wrap(
@@ -535,7 +560,9 @@ class _SearchResultTile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isEnt ? AppColors.black : AppColors.darkGrey,
+              color: disabled
+                  ? AppColors.grey
+                  : (isEnt ? AppColors.black : AppColors.darkGrey),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(displayAisle,

@@ -13,6 +13,13 @@ import '../../features/home/home_screen.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
 
+/// Ends that don't belong to this store — shown as disabled/grayed out.
+const _disabledEnds = <String>{'FGE011', 'FGE012', 'OGE011', 'OGE012'};
+
+/// Returns true if the aisle ID is a disabled end (not belonging to this store).
+bool _isDisabledEnd(String aisle) =>
+    _disabledEnds.contains(aisle.toUpperCase());
+
 class ProductListScreen extends ConsumerStatefulWidget {
   final String? date;
   final String? sheet;
@@ -388,13 +395,20 @@ class _AisleCard extends StatelessWidget {
     final subtitle = _sectionSubtitle(aisle);
     final isSpecialSection =
         ['BIN', 'POS'].contains(aisle) || aisle.startsWith('ENT');
+    final disabled = _isDisabledEnd(aisle);
+    final headerColor = disabled
+        ? AppColors.grey
+        : (isSpecialSection ? AppColors.darkGrey : AppColors.black);
+    final borderColor = disabled
+        ? AppColors.grey.withValues(alpha: 0.4)
+        : (isSpecialSection ? AppColors.darkGrey : AppColors.black);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: disabled ? AppColors.lightGrey : AppColors.white,
         border: Border.all(
-          color: isSpecialSection ? AppColors.darkGrey : AppColors.black,
+          color: borderColor,
           width: isSpecialSection ? 2.5 : 2,
         ),
         borderRadius: BorderRadius.circular(12),
@@ -406,7 +420,7 @@ class _AisleCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: isSpecialSection ? AppColors.darkGrey : AppColors.black,
+              color: headerColor,
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(9)),
             ),
@@ -442,16 +456,31 @@ class _AisleCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              children: group.products.asMap().entries.map((e) {
-                final isLast = e.key == group.products.length - 1;
-                return Column(
-                  children: [
-                    _ProductTile(product: e.value, query: query),
-                    if (!isLast)
-                      const Divider(color: AppColors.lightGrey, height: 24),
-                  ],
-                );
-              }).toList(),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (disabled)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'This end does not belong to this store',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ...group.products.asMap().entries.map((e) {
+                  final isLast = e.key == group.products.length - 1;
+                  return Column(
+                    children: [
+                      _ProductTile(product: e.value, query: query),
+                      if (!isLast)
+                        const Divider(color: AppColors.lightGrey, height: 24),
+                    ],
+                  );
+                }).toList(),
+              ],
             ),
           ),
         ],
@@ -478,6 +507,7 @@ class _ProductTile extends StatelessWidget {
         product.sheetName?.toUpperCase() ??
         'GEN';
     final isEnt = displayAisle.startsWith('ENT');
+    final disabled = _isDisabledEnd(displayAisle);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,20 +516,39 @@ class _ProductTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: query.isNotEmpty
-                  ? HighlightedText(
-                      text: product.name.toUpperCase(),
-                      query: query.toUpperCase(),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: AppColors.black),
-                    )
-                  : Text(product.name.toUpperCase(),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                          color: AppColors.black)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  query.isNotEmpty
+                      ? HighlightedText(
+                          text: product.name.toUpperCase(),
+                          query: query.toUpperCase(),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color:
+                                  disabled ? AppColors.grey : AppColors.black),
+                        )
+                      : Text(product.name.toUpperCase(),
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              color:
+                                  disabled ? AppColors.grey : AppColors.black)),
+                  if (disabled)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'This end does not belong to this store',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             if (showAisle)
               // Aisle badge — only shown in search results
@@ -507,7 +556,9 @@ class _ProductTile extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isEnt ? AppColors.black : AppColors.darkGrey,
+                  color: disabled
+                      ? AppColors.grey
+                      : (isEnt ? AppColors.black : AppColors.darkGrey),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(displayAisle,
@@ -519,18 +570,20 @@ class _ProductTile extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: refs.map((ref) {
-            if (query.isNotEmpty &&
-                ref.toLowerCase().contains(query.toLowerCase())) {
-              return _RefChipHighlighted(ref: ref, query: query);
-            }
-            return _RefChip(ref: ref);
-          }).toList(),
-        ),
+        if (!disabled) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: refs.map((ref) {
+              if (query.isNotEmpty &&
+                  ref.toLowerCase().contains(query.toLowerCase())) {
+                return _RefChipHighlighted(ref: ref, query: query);
+              }
+              return _RefChip(ref: ref);
+            }).toList(),
+          ),
+        ],
       ],
     );
   }
