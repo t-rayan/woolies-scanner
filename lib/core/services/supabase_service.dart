@@ -222,6 +222,27 @@ class SupabaseService {
     }
   }
 
+  /// Fetches EVERY row from scanned_products (dataset is ~24KB).
+  /// Used for offline-first local caching — called once at app init.
+  Future<List<Product>> fetchAllProducts() async {
+    try {
+      final response = await client
+          .from('scanned_products')
+          .select()
+          .order('name', ascending: true);
+
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      final products = rows.map((r) => Product.fromMap(r)).toList();
+      _dbLog('Fetched ${products.length} products into local cache');
+      return products;
+    } catch (e) {
+      _logError('fetchAllProducts', e);
+      return [];
+    }
+  }
+
+  /// Legacy search — no longer called from UI (kept for reference / direct use).
+  /// Use [fetchAllProducts] + local filtering instead.
   Future<List<Product>> searchProducts(String query) async {
     try {
       final searchTerm = '%$query%';
