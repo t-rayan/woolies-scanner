@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
-    // Flutter's Gradle Plugin handles Kotlin internally — no need for kotlin-android.
+    id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 

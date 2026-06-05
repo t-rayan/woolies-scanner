@@ -14,17 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: flutter pub get
-      - name: Create dummy env_secrets.txt for asset bundler
-        run: |
-          echo 'SUPABASE_URL=dummy' > env_secrets.txt
-          echo 'SUPABASE_ANON_KEY=dummy' >> env_secrets.txt
-          echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> env_secrets.txt
+      - name: Create dummy .env for asset bundler
+        run: echo 'SUPABASE_URL=dummy' > .env
       - name: Build Flutter Web
         run: |
           flutter build web --release \
           --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
-          --dart-define=ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

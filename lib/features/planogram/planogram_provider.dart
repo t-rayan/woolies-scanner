@@ -1,19 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../core/models/planogram_model.dart';
-import '../../core/services/env_loader.dart';
 import '../../core/services/planogram_parser.dart';
 
-/// Provider for the API key from env_secrets.txt
-final anthropicApiKeyProvider = FutureProvider<String?>((ref) async {
-  return EnvLoader.get('ANTHROPIC_API_KEY');
+/// Provider for the API key from .env
+final anthropicApiKeyProvider = Provider<String?>((ref) {
+  return dotenv.env['ANTHROPIC_API_KEY'];
 });
 
 /// Provider for the PlanogramParser service
-final planogramParserProvider = FutureProvider<PlanogramParser?>((ref) async {
-  final apiKeyAsync = await ref.watch(anthropicApiKeyProvider.future);
-  if (apiKeyAsync == null || apiKeyAsync.trim().isEmpty) return null;
-  return PlanogramParser(apiKeyAsync);
+final planogramParserProvider = Provider<PlanogramParser?>((ref) {
+  final apiKey = ref.watch(anthropicApiKeyProvider);
+  if (apiKey == null || apiKey.trim().isEmpty) return null;
+  return PlanogramParser(apiKey);
 });
 
 /// Async state for the current planogram data
@@ -31,10 +31,10 @@ class PlanogramNotifier extends StateNotifier<AsyncValue<Planogram?>> {
   Future<void> processImage(XFile image) async {
     state = const AsyncValue.loading();
 
-    final parser = await _ref.read(planogramParserProvider.future);
+    final parser = _ref.read(planogramParserProvider);
     if (parser == null) {
       state = AsyncValue.error(
-        Exception('ANTHROPIC_API_KEY is not set. Check env_secrets.txt'),
+        Exception('ANTHROPIC_API_KEY is not set. Add it to your .env file.'),
         StackTrace.current,
       );
       return;

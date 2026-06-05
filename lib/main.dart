@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,7 +8,6 @@ import 'features/home/home_screen.dart';
 import 'features/products/product_list_screen.dart';
 import 'features/scanner/scanner_screen.dart';
 import 'core/constants/app_colors.dart';
-import 'core/services/env_loader.dart';
 import 'core/services/supabase_service.dart';
 
 /// Logs a message to the browser console so you can see it live in devtools.
@@ -25,36 +25,46 @@ Future<void> main() async {
   //   2. .env file via dotenv (used for local Android/iOS development)
   // ============================================================
 
-  // 1st priority: --dart-define compile-time constant
+  // 1st priority: --dart-define compile-time constant (always available on web)
   const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
   const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2nd priority: env_secrets.txt from asset bundle
-  // (load may fail on web before runApp; get() retries lazily)
-  await EnvLoader.load();
-  final envUrl = await EnvLoader.get('SUPABASE_URL');
-  final envKey = await EnvLoader.get('SUPABASE_ANON_KEY');
+  // 2nd priority: .env file fallback (only on native mobile, not on web CI)
+  String? envUrl;
+  String? envKey;
+
+  if (!kIsWeb) {
+    try {
+      await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 1));
+      envUrl = dotenv.env['SUPABASE_URL'];
+      envKey = dotenv.env['SUPABASE_ANON_KEY'];
+      _consoleLog('.env file loaded via flutter_dotenv');
+    } catch (_) {
+      _consoleLog('.env not loaded — relying on --dart-define');
+    }
+  }
 
   // Pick whichever is available
   final supabaseUrl = dartDefineUrl.isNotEmpty ? dartDefineUrl : (envUrl ?? '');
   final supabaseAnonKey =
       dartDefineKey.isNotEmpty ? dartDefineKey : (envKey ?? '');
 
-  _consoleLog('--- Supabase ---');
-  _consoleLog(supabaseUrl.isEmpty ? '❌ URL: EMPTY' : '✅ URL: $supabaseUrl');
+  _consoleLog('--- Supabase Credentials ---');
+  _consoleLog(
+      'Source: ${dartDefineUrl.isNotEmpty ? "--dart-define" : (envUrl != null ? ".env" : "NONE")}');
+  _consoleLog(supabaseUrl.isEmpty ? 'URL: (EMPTY!)' : 'URL: $supabaseUrl');
   _consoleLog(supabaseAnonKey.isEmpty
-      ? '❌ KEY: EMPTY'
-      : '✅ KEY: ${supabaseAnonKey.substring(0, 20)}...');
+      ? 'KEY: (EMPTY!)'
+      : 'KEY: ${supabaseAnonKey.substring(0, 20)}...');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    _consoleLog('❌ Supabase unavailable');
+    _consoleLog('❌ Credentials EMPTY — Supabase features unavailable');
   } else {
     try {
       await SupabaseService.instance.initialize(
         supabaseUrl: supabaseUrl,
         supabaseAnonKey: supabaseAnonKey,
       );
-      _consoleLog('✅ Supabase initialized');
     } catch (e) {
       _consoleLog('❌ Supabase init failed: $e');
     }

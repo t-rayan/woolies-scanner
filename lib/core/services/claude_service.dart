@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
@@ -12,9 +13,8 @@ class ClaudeService {
 
   ClaudeService(this.apiKey);
 
-  /// Preprocesses raw image bytes: decodes, fixes EXIF orientation, resizes to
-  /// [targetMaxPixels] on the longest edge, and encodes as JPEG.
-  static Future<Uint8List> preprocessBytes(Uint8List rawBytes) async {
+  static Future<Uint8List> preprocessImage(XFile file) async {
+    final Uint8List rawBytes = await file.readAsBytes();
     final img.Image? original = img.decodeImage(rawBytes);
     if (original == null) {
       throw Exception('Could not decode image for preprocessing.');
@@ -28,39 +28,15 @@ class ClaudeService {
     }
     final Uint8List jpegBytes = img.encodeJpg(resized, quality: 92);
     debugPrint(
-      '\u{1F4D0} Image preprocessed: '
-      '${upright.width}x${upright.height} \u{2192} ${resized.width}x${resized.height}px, '
+      '📐 Image preprocessed: '
+      '${upright.width}x${upright.height} → ${resized.width}x${resized.height}px, '
       '${(jpegBytes.length / 1024).toStringAsFixed(1)}KB',
     );
     return jpegBytes;
   }
 
-  /// Preprocesses an [XFile] (mobile path) — reads bytes then delegates to
-  /// [preprocessBytes].
-  static Future<Uint8List> preprocessImage(XFile file) async {
-    final Uint8List rawBytes = await file.readAsBytes();
-    return preprocessBytes(rawBytes);
-  }
-
-  /// Analyzes an image from raw bytes (used on **web** where file paths
-  /// are unavailable).
-  Future<List<Map<String, dynamic>>> analyzeBytes(Uint8List rawBytes) async {
-    final Uint8List processedBytes = await preprocessBytes(rawBytes);
-    return _sendToClaude(processedBytes);
-  }
-
-  /// Analyzes an image from an [XFile] (used on **mobile** where local file
-  /// paths are available). Delegates to [analyzeBytes] after reading the file.
   Future<List<Map<String, dynamic>>> analyzeImage(XFile imageFile) async {
     final Uint8List processedBytes = await preprocessImage(imageFile);
-    return _sendToClaude(processedBytes);
-  }
-
-  // ─── Shared HTTP call to Claude API ──────────────────────────
-
-  /// Sends preprocessed JPEG bytes to Claude, returns parsed products.
-  Future<List<Map<String, dynamic>>> _sendToClaude(
-      Uint8List processedBytes) async {
     final String base64Image = base64Encode(processedBytes);
 
     final response = await http.post(
