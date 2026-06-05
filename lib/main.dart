@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/home/home_screen.dart';
@@ -70,6 +71,9 @@ Future<void> main() async {
       _consoleLog('❌ Supabase init failed: $e');
     }
   }
+
+  // Enable clean URLs (no #) for Flutter Web
+  usePathUrlStrategy();
 
   runApp(
     ProviderScope(
