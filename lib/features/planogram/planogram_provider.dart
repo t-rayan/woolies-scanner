@@ -1,18 +1,31 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../core/models/planogram_model.dart';
 import '../../core/services/planogram_parser.dart';
 
-/// Provider for the API key from .env
-final anthropicApiKeyProvider = Provider<String?>((ref) {
-  return dotenv.env['ANTHROPIC_API_KEY'];
-});
+/// Compile-time override: `--dart-define=CLAUDE_API_KEY=sk-ant-...`
+const String _dartClaudeKey = String.fromEnvironment('CLAUDE_API_KEY');
+
+/// Resolves the Claude API key:
+/// 1. `--dart-define=CLAUDE_API_KEY` (all platforms, required for web)
+/// 2. `CLAUDE_API_KEY` in `.env` (mobile dev fallback)
+String _resolveClaudeKey() {
+  if (_dartClaudeKey.isNotEmpty) return _dartClaudeKey;
+  final dotenvKey = dotenv.env['CLAUDE_API_KEY'] ?? '';
+  if (dotenvKey.isNotEmpty) return dotenvKey;
+  debugPrint(
+    'Configuration Error: CLAUDE_API_KEY is not set. '
+    'Run the web build using --dart-define parameters.',
+  );
+  return '';
+}
 
 /// Provider for the PlanogramParser service
 final planogramParserProvider = Provider<PlanogramParser?>((ref) {
-  final apiKey = ref.watch(anthropicApiKeyProvider);
-  if (apiKey == null || apiKey.trim().isEmpty) return null;
+  final apiKey = _resolveClaudeKey();
+  if (apiKey.isEmpty) return null;
   return PlanogramParser(apiKey);
 });
 
@@ -34,7 +47,8 @@ class PlanogramNotifier extends StateNotifier<AsyncValue<Planogram?>> {
     final parser = _ref.read(planogramParserProvider);
     if (parser == null) {
       state = AsyncValue.error(
-        Exception('ANTHROPIC_API_KEY is not set. Add it to your .env file.'),
+        Exception(
+            'CLAUDE_API_KEY is not set. Add it to .env or use --dart-define.'),
         StackTrace.current,
       );
       return;
