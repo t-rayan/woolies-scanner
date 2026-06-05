@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -37,7 +38,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final claudeService = ClaudeService.fromEnvironment();
+      final String apiKey = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+      if (apiKey.isEmpty) throw Exception('API Key missing from .env');
+
+      final claudeService = ClaudeService(apiKey);
 
       // Image preprocessing happens inside analyzeImage (EXIF + resize to 2576px)
       setState(() => _statusMessage = 'Analyzing sheet...');

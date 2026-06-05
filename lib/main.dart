@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,34 +29,18 @@ Future<void> main() async {
   const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
   const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2nd priority: .env file from asset bundle (works on all platforms)
+  // 2nd priority: .env file fallback (only on native mobile, not on web CI)
   String? envUrl;
   String? envKey;
 
-  try {
-    // Use flutter_dotenv first (works on mobile, may fail on web)
-    await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 2));
-    envUrl = dotenv.env['SUPABASE_URL'];
-    envKey = dotenv.env['SUPABASE_ANON_KEY'];
-    _consoleLog('.env file loaded via flutter_dotenv');
-  } catch (_) {
-    // Fallback: load .env directly via rootBundle (works on web too)
-    _consoleLog('dotenv failed, trying rootBundle...');
+  if (!kIsWeb) {
     try {
-      final raw = await rootBundle.loadString('.env');
-      for (final line in raw.split('\n')) {
-        final t = line.trim();
-        if (t.isEmpty || t.startsWith('#')) continue;
-        final idx = t.indexOf('=');
-        if (idx == -1) continue;
-        final k = t.substring(0, idx).trim();
-        final v = t.substring(idx + 1).trim();
-        if (k == 'SUPABASE_URL') envUrl = v;
-        if (k == 'SUPABASE_ANON_KEY') envKey = v;
-      }
-      _consoleLog('.env parsed via rootBundle');
-    } catch (e2) {
-      _consoleLog('.env also failed via rootBundle: $e2');
+      await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 1));
+      envUrl = dotenv.env['SUPABASE_URL'];
+      envKey = dotenv.env['SUPABASE_ANON_KEY'];
+      _consoleLog('.env file loaded via flutter_dotenv');
+    } catch (_) {
+      _consoleLog('.env not loaded — relying on --dart-define');
     }
   }
 

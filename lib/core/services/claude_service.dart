@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -12,36 +11,7 @@ class ClaudeService {
   static const String primaryModel = 'claude-opus-4-7';
   static const int targetMaxPixels = 2576;
 
-  /// Compile-time override: `--dart-define=CLAUDE_API_KEY=sk-ant-...`
-  static const String _dartDefineKey = String.fromEnvironment('CLAUDE_API_KEY');
-
   ClaudeService(this.apiKey);
-
-  // ─── Factory ────────────────────────────────────────────────
-
-  /// Creates a [ClaudeService] by resolving the API key from:
-  /// 1. `--dart-define=CLAUDE_API_KEY=...` (all platforms, required for web)
-  /// 2. `CLAUDE_API_KEY` in `.env` (mobile dev fallback)
-  ///
-  /// Throws a clear error if neither source provides a key.
-  factory ClaudeService.fromEnvironment() {
-    // Priority 1: compile-time --dart-define
-    if (_dartDefineKey.isNotEmpty) return ClaudeService(_dartDefineKey);
-
-    // Priority 2: flutter_dotenv (works on mobile where .env is loaded)
-    final dotenvKey = dotenv.env['CLAUDE_API_KEY'] ?? '';
-    if (dotenvKey.isNotEmpty) return ClaudeService(dotenvKey);
-
-    // No key found — log and throw
-    debugPrint(
-      'Configuration Error: CLAUDE_API_KEY is not set. '
-      'Run the web build using --dart-define parameters.',
-    );
-    throw Exception(
-      'Configuration Error: CLAUDE_API_KEY is not set. '
-      'Run the web build using --dart-define parameters.',
-    );
-  }
 
   static Future<Uint8List> preprocessImage(XFile file) async {
     final Uint8List rawBytes = await file.readAsBytes();
@@ -65,22 +35,9 @@ class ClaudeService {
     return jpegBytes;
   }
 
-  // ─── Public API ───────────────────────────────────────────────
-
-  /// Accepts a photo [XFile], preprocesses it, sends to Claude, returns products.
   Future<List<Map<String, dynamic>>> analyzeImage(XFile imageFile) async {
     final Uint8List processedBytes = await preprocessImage(imageFile);
-    return _sendToClaudeDirect(processedBytes);
-  }
-
-  // ─── Direct HTTP call to Claude API ─────────────────────────
-
-  /// Sends preprocessed JPEG [imageBytes] to the Anthropic API and returns
-  /// parsed product records. Isolated so it can be replaced by a backend
-  /// proxy call (see [_sendToSupabaseEdgeFunction] below).
-  Future<List<Map<String, dynamic>>> _sendToClaudeDirect(
-      Uint8List imageBytes) async {
-    final String base64Image = base64Encode(imageBytes);
+    final String base64Image = base64Encode(processedBytes);
 
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -136,50 +93,6 @@ class ClaudeService {
     final String authoritativeDate = _extractWcDate(responseText);
     return _parseResponse(responseText, authoritativeDate);
   }
-
-  // ─── Future Backend Proxy (placeholder) ─────────────────────
-
-  /// When this app is deployed to production on Firebase Hosting, the API key
-  /// will be exposed in the browser's public JS bundle. To avoid this,
-  /// migrate the Vision request to a secure backend endpoint (e.g. a Supabase
-  /// Edge Function, Cloud Function, or Firebase Function) that holds the key
-  /// server-side.
-  ///
-  /// Uncomment and wire this method into [analyzeImage] once the backend is
-  /// deployed. The backend endpoint should accept the same preprocessed JPEG
-  /// bytes and return the same JSON structure as [_sendToClaudeDirect].
-  ///
-  // Future<List<Map<String, dynamic>>> _sendToSupabaseEdgeFunction(
-  //     Uint8List imageBytes) async {
-  //   final String base64Image = base64Encode(imageBytes);
-  //
-  //   // TODO: Replace with your actual Edge Function URL
-  //   final response = await http.post(
-  //     Uri.parse(
-  //       'https://YOUR-PROJECT.supabase.co/functions/v1/analyze-planogram',
-  //     ),
-  //     headers: {
-  //       'Content-Type': 'application/json',
-  //       // The anon key is safe to expose; the Edge Function validates the
-  //       // request and applies its own server-side CLAUDE_API_KEY.
-  //       'Authorization': 'Bearer ${SupabaseService.instance.client.auth}' ,
-  //     },
-  //     body: jsonEncode({
-  //       'image': base64Image,
-  //       'model': primaryModel,
-  //       'prompt': _buildPrompt(),
-  //     }),
-  //   );
-  //
-  //   if (response.statusCode != 200) {
-  //     throw Exception('Edge Function Error: ${response.body}');
-  //   }
-  //
-  //   final data = jsonDecode(response.body) as Map<String, dynamic>;
-  //   final responseText = data['result'] as String;
-  //   final String authoritativeDate = _extractWcDate(responseText);
-  //   return _parseResponse(responseText, authoritativeDate);
-  // }
 
   String _buildPrompt() {
     return '''
