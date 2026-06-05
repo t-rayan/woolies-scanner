@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -25,6 +26,29 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? _errorMessage;
   final ImagePicker _picker = ImagePicker();
 
+  /// Resolves the Anthropic API key from dotenv or rootBundle fallback.
+  Future<String> _resolveApiKey() async {
+    final fromDotenv = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+    if (fromDotenv.isNotEmpty) return fromDotenv;
+
+    // Fallback: parse .env directly via rootBundle
+    try {
+      final raw = await rootBundle.loadString('.env');
+      for (final line in raw.split('\n')) {
+        final t = line.trim();
+        if (t.isEmpty || t.startsWith('#')) continue;
+        final idx = t.indexOf('=');
+        if (idx == -1) continue;
+        final k = t.substring(0, idx).trim();
+        if (k == 'ANTHROPIC_API_KEY') {
+          return t.substring(idx + 1).trim();
+        }
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
   /// Mobile-only: picks an image via camera or gallery, then processes.
   Future<void> _pickAndProcessImage({required ImageSource source}) async {
     try {
@@ -40,7 +64,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final String apiKey = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+      final apiKey = await _resolveApiKey();
       if (apiKey.isEmpty) throw Exception('API Key missing from .env');
 
       final claudeService = ClaudeService(apiKey);
@@ -68,7 +92,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final String apiKey = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
+      final apiKey = await _resolveApiKey();
       if (apiKey.isEmpty) throw Exception('API Key missing from .env');
 
       // Web: files come as raw bytes (no local path available)
