@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +7,7 @@ import 'features/home/home_screen.dart';
 import 'features/products/product_list_screen.dart';
 import 'features/scanner/scanner_screen.dart';
 import 'core/constants/app_colors.dart';
+import 'core/services/env_loader.dart';
 import 'core/services/supabase_service.dart';
 
 /// Logs a message to the browser console so you can see it live in devtools.
@@ -26,39 +25,14 @@ Future<void> main() async {
   //   2. .env file via dotenv (used for local Android/iOS development)
   // ============================================================
 
-  // 1st priority: --dart-define compile-time constant (always available on web)
+  // 1st priority: --dart-define compile-time constant
   const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
   const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2nd priority: .env file fallback (loaded from asset bundle)
-  String? envUrl;
-  String? envKey;
-
-  try {
-    await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 2));
-    envUrl = dotenv.env['SUPABASE_URL'];
-    envKey = dotenv.env['SUPABASE_ANON_KEY'];
-    _consoleLog('.env file loaded');
-  } catch (e) {
-    _consoleLog('.env load failed: $e');
-    // Fallback: manually parse from rootBundle
-    try {
-      final raw = await rootBundle.loadString('.env');
-      for (final line in raw.split('\n')) {
-        final t = line.trim();
-        if (t.isEmpty || t.startsWith('#')) continue;
-        final idx = t.indexOf('=');
-        if (idx == -1) continue;
-        final k = t.substring(0, idx).trim();
-        final v = t.substring(idx + 1).trim();
-        if (k == 'SUPABASE_URL') envUrl = v;
-        if (k == 'SUPABASE_ANON_KEY') envKey = v;
-      }
-      _consoleLog('.env parsed via rootBundle fallback');
-    } catch (e2) {
-      _consoleLog('rootBundle fallback also failed: $e2');
-    }
-  }
+  // 2nd priority: .env file from asset bundle (works on all platforms)
+  await EnvLoader.load();
+  final envUrl = EnvLoader.get('SUPABASE_URL');
+  final envKey = EnvLoader.get('SUPABASE_ANON_KEY');
 
   // Pick whichever is available
   final supabaseUrl = dartDefineUrl.isNotEmpty ? dartDefineUrl : (envUrl ?? '');
