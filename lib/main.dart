@@ -29,19 +29,17 @@ Future<void> main() async {
   const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
   const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2nd priority: .env file fallback (only on native mobile, not on web CI)
+  // 2nd priority: .env file fallback (works on all platforms — it's in assets:)
   String? envUrl;
   String? envKey;
 
-  if (!kIsWeb) {
-    try {
-      await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 1));
-      envUrl = dotenv.env['SUPABASE_URL'];
-      envKey = dotenv.env['SUPABASE_ANON_KEY'];
-      _consoleLog('.env file loaded via flutter_dotenv');
-    } catch (_) {
-      _consoleLog('.env not loaded — relying on --dart-define');
-    }
+  try {
+    await dotenv.load(fileName: '.env').timeout(const Duration(seconds: 1));
+    envUrl = dotenv.env['SUPABASE_URL'];
+    envKey = dotenv.env['SUPABASE_ANON_KEY'];
+    _consoleLog('.env file loaded via flutter_dotenv');
+  } catch (_) {
+    _consoleLog('.env not loaded — relying on --dart-define');
   }
 
   // Pick whichever is available
