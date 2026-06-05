@@ -29,32 +29,32 @@ Future<void> main() async {
   const dartDefineUrl = String.fromEnvironment('SUPABASE_URL');
   const dartDefineKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2nd priority: .env file from asset bundle (works on all platforms)
+  // 2nd priority: env_secrets.txt from asset bundle
+  // (load may fail on web before runApp; get() retries lazily)
   await EnvLoader.load();
-  final envUrl = EnvLoader.get('SUPABASE_URL');
-  final envKey = EnvLoader.get('SUPABASE_ANON_KEY');
+  final envUrl = await EnvLoader.get('SUPABASE_URL');
+  final envKey = await EnvLoader.get('SUPABASE_ANON_KEY');
 
   // Pick whichever is available
   final supabaseUrl = dartDefineUrl.isNotEmpty ? dartDefineUrl : (envUrl ?? '');
   final supabaseAnonKey =
       dartDefineKey.isNotEmpty ? dartDefineKey : (envKey ?? '');
 
-  _consoleLog('--- Supabase Credentials ---');
-  _consoleLog(
-      'Source: ${dartDefineUrl.isNotEmpty ? "--dart-define" : (envUrl != null ? ".env" : "NONE")}');
-  _consoleLog(supabaseUrl.isEmpty ? 'URL: (EMPTY!)' : 'URL: $supabaseUrl');
+  _consoleLog('--- Supabase ---');
+  _consoleLog(supabaseUrl.isEmpty ? '❌ URL: EMPTY' : '✅ URL: $supabaseUrl');
   _consoleLog(supabaseAnonKey.isEmpty
-      ? 'KEY: (EMPTY!)'
-      : 'KEY: ${supabaseAnonKey.substring(0, 20)}...');
+      ? '❌ KEY: EMPTY'
+      : '✅ KEY: ${supabaseAnonKey.substring(0, 20)}...');
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    _consoleLog('❌ Credentials EMPTY — Supabase features unavailable');
+    _consoleLog('❌ Supabase unavailable');
   } else {
     try {
       await SupabaseService.instance.initialize(
         supabaseUrl: supabaseUrl,
         supabaseAnonKey: supabaseAnonKey,
       );
+      _consoleLog('✅ Supabase initialized');
     } catch (e) {
       _consoleLog('❌ Supabase init failed: $e');
     }

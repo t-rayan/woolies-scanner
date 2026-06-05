@@ -1,43 +1,40 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-/// Standalone .env file loader that works on ALL platforms (web, Android, iOS)
-/// by reading from the asset bundle via [rootBundle].
+/// Loads env vars from the asset bundle using [rootBundle].
 ///
-/// No dependency on flutter_dotenv.
+/// On web, assets aren't available before [runApp], so the eager [load] call
+/// in [main] may fail. The [get] method retries lazily on first access.
 class EnvLoader {
   static final Map<String, String> _env = {};
   static bool _loaded = false;
+  static bool _loadingAttempted = false;
 
-  /// Call once at app startup.
+  /// Attempts to load and parse env_secrets.txt.
+  /// Safe to call multiple times — only tries once.
   static Future<void> load() async {
-    if (_loaded) return;
+    if (_loadingAttempted) return;
+    _loadingAttempted = true;
     try {
-      final raw = await rootBundle.loadString('.env');
+      final raw = await rootBundle.loadString('env_secrets.txt');
       for (final line in raw.split('\n')) {
         final t = line.trim();
         if (t.isEmpty || t.startsWith('#')) continue;
         final idx = t.indexOf('=');
         if (idx == -1) continue;
-        final k = t.substring(0, idx).trim();
-        final v = t.substring(idx + 1).trim();
-        _env[k] = v;
+        _env[t.substring(0, idx).trim()] = t.substring(idx + 1).trim();
       }
       _loaded = true;
-      debugPrint('[ENV] Loaded ${_env.length} variables from .env');
-    } catch (e) {
-      debugPrint('[ENV] Failed to load .env: $e');
+    } catch (_) {
+      // First attempt failed (e.g. web before runApp). Reset so [get] retries.
+      _loadingAttempted = false;
     }
   }
 
-  /// Returns the value for [key], or [defaultValue] if not found.
-  static String? get(String key, {String? defaultValue}) {
-    return _env[key] ?? defaultValue;
+  /// Returns the value for [key]. Retries loading if previous attempt failed.
+  static Future<String?> get(String key) async {
+    if (!_loaded) await load();
+    return _env[key];
   }
 
-  /// Returns true if the loader has finished reading the file.
   static bool get isLoaded => _loaded;
-
-  /// Returns the entire env map (for debugging).
-  static Map<String, String> get all => Map.unmodifiable(_env);
 }

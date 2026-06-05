@@ -25,8 +25,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? _errorMessage;
   final ImagePicker _picker = ImagePicker();
 
-  /// Returns the Anthropic API key (loaded by [EnvLoader] at startup).
-  String get _apiKey => EnvLoader.get('ANTHROPIC_API_KEY') ?? '';
+  /// Returns the Anthropic API key (loaded by [EnvLoader]).
+  Future<String> _apiKey() async =>
+      (await EnvLoader.get('ANTHROPIC_API_KEY')) ?? '';
 
   /// Mobile-only: picks an image via camera or gallery, then processes.
   Future<void> _pickAndProcessImage({required ImageSource source}) async {
@@ -43,8 +44,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final apiKey = _apiKey;
-      if (apiKey.isEmpty) throw Exception('API Key missing from .env');
+      final apiKey = await _apiKey();
+      if (apiKey.isEmpty) {
+        throw Exception('ANTHROPIC_API_KEY not found. Check env_secrets.txt');
+      }
 
       final claudeService = ClaudeService(apiKey);
       setState(() => _statusMessage = 'Analyzing sheet...');
@@ -71,8 +74,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final apiKey = _apiKey;
-      if (apiKey.isEmpty) throw Exception('API Key missing from .env');
+      final apiKey = await _apiKey();
+      if (apiKey.isEmpty) {
+        throw Exception('ANTHROPIC_API_KEY not found. Check env_secrets.txt');
+      }
 
       // Web: files come as raw bytes (no local path available)
       final Uint8List? bytes = result.files.first.bytes;
