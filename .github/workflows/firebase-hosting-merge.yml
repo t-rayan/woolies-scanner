@@ -23,15 +23,19 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # Create dummy .env so asset bundler doesn't fail (real creds come from --dart-define)
-      - name: Create dummy .env for asset bundler
-        run: echo 'SUPABASE_URL=dummy' > .env
+      # Create asset file so asset bundler doesn't fail
+      - name: Create env_secrets.txt for asset bundler
+        run: |
+          echo 'SUPABASE_URL=dummy' > env_secrets.txt
+          echo 'SUPABASE_ANON_KEY=dummy' >> env_secrets.txt
+          echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> env_secrets.txt
 
       - name: Build Flutter Web
         run: |
           flutter build web --release \
           --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+          --dart-define=ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

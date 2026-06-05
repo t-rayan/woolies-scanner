@@ -9,6 +9,14 @@ class EnvLoader {
   static bool _loaded = false;
   static bool _loadingAttempted = false;
 
+  // Compile-time overrides from --dart-define (set in CI/CD)
+  static const String _dartDefineSupabaseUrl =
+      String.fromEnvironment('SUPABASE_URL');
+  static const String _dartDefineSupabaseKey =
+      String.fromEnvironment('SUPABASE_ANON_KEY');
+  static const String _dartDefineAnthropicKey =
+      String.fromEnvironment('ANTHROPIC_API_KEY');
+
   /// Attempts to load and parse env_secrets.txt.
   /// Safe to call multiple times — only tries once.
   static Future<void> load() async {
@@ -30,8 +38,20 @@ class EnvLoader {
     }
   }
 
-  /// Returns the value for [key]. Retries loading if previous attempt failed.
+  /// Returns the value for [key]. Checks `--dart-define` first, then asset file.
   static Future<String?> get(String key) async {
+    // 1st priority: compile-time --dart-define
+    if (key == 'SUPABASE_URL' && _dartDefineSupabaseUrl.isNotEmpty) {
+      return _dartDefineSupabaseUrl;
+    }
+    if (key == 'SUPABASE_ANON_KEY' && _dartDefineSupabaseKey.isNotEmpty) {
+      return _dartDefineSupabaseKey;
+    }
+    if (key == 'ANTHROPIC_API_KEY' && _dartDefineAnthropicKey.isNotEmpty) {
+      return _dartDefineAnthropicKey;
+    }
+
+    // 2nd priority: from asset file (retries if previous attempt failed)
     if (!_loaded) await load();
     return _env[key];
   }
