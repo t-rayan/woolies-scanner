@@ -1,12 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/models/fge_model.dart';
+import '../../core/services/env_loader.dart';
 import '../../core/services/fge_parser.dart';
 
 /// Provider for the FGE parser service
-final fgeParserProvider = Provider<FgeParser?>((ref) {
-  final apiKey = dotenv.env['ANTHROPIC_API_KEY'];
+final fgeParserProvider = FutureProvider<FgeParser?>((ref) async {
+  final apiKey = await EnvLoader.get('ANTHROPIC_API_KEY');
   if (apiKey == null || apiKey.trim().isEmpty) return null;
   return FgeParser(apiKey);
 });
@@ -48,10 +48,10 @@ class FgePlanogramNotifier extends StateNotifier<AsyncValue<FgePlanogram?>> {
   Future<void> processImage(XFile image) async {
     state = const AsyncValue.loading();
 
-    final parser = _ref.read(fgeParserProvider);
+    final parser = await _ref.read(fgeParserProvider.future);
     if (parser == null) {
       state = AsyncValue.error(
-        Exception('ANTHROPIC_API_KEY is not set. Add it to your .env file.'),
+        Exception('ANTHROPIC_API_KEY is not set. Check env_secrets.txt'),
         StackTrace.current,
       );
       return;
