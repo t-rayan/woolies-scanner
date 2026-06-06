@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
+import 'package:woolies_scanner/features/admin/login_screen.dart';
 
 import 'features/home/home_screen.dart';
 import 'features/admin/admin_screen.dart';
@@ -102,8 +103,23 @@ final _router = GoRouter(
       builder: (context, state) => const ScannerScreen(),
     ),
     GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminScreen(),
+      redirect: (context, state) {
+        // Check if our custom service wrapper has an active user session
+        final isReady = SupabaseService.instance.isReady;
+        if (!isReady) return '/login';
+
+        final session = SupabaseService.instance.client.auth.currentSession;
+        if (session == null) {
+          return '/login'; // Kicks logged-out users to the login screen
+        }
+        return null; // Allows authenticated users through
+      },
     ),
     GoRoute(
       path: '/database',

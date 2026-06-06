@@ -29,25 +29,70 @@ class SupabaseService {
   /// [supabaseUrl] and [supabaseAnonKey] are now passed explicitly.
   /// In production, the caller should use `const String.fromEnvironment()`
   /// (injected via `--dart-define` in the CI build).
+  // Future<void> initialize({
+  //   String supabaseUrl = '',
+  //   String supabaseAnonKey = '',
+  // }) async {
+  //   if (_initialized) return;
+
+  //   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+  //     debugPrint(
+  //       '⚠️ Supabase credentials missing (url empty=${supabaseUrl.isEmpty}, '
+  //       'key empty=${supabaseAnonKey.isEmpty}) — DB features unavailable.',
+  //     );
+  //     return;
+  //   }
+
+  //   debugPrint('🔌 Initializing Supabase with URL: $supabaseUrl');
+
+  //   await Supabase.initialize(
+  //     url: supabaseUrl,
+  //     anonKey: supabaseAnonKey,
+  //     debug: kDebugMode,
+  //   );
+
+  //   _client = Supabase.instance.client;
+  //   _initialized = true;
+  //   debugPrint('✅ Supabase initialized successfully');
+  // }
+
+  // my custom code
+
+  /// Must be called once before any DB operations (e.g. in main()).
+  ///
+  /// Forces Web builds to grab keys directly from compile-time terminal environment variables.
   Future<void> initialize({
     String supabaseUrl = '',
     String supabaseAnonKey = '',
   }) async {
     if (_initialized) return;
 
-    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    // 1. Declare explicit compile-time constants (removed 'static')
+    const String _webUrl = String.fromEnvironment('SUPABASE_URL');
+    const String _webKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+    // 2. Intercept and override if running on Web browser
+    String finalUrl = supabaseUrl;
+    String finalKey = supabaseAnonKey;
+
+    if (kIsWeb) {
+      finalUrl = _webUrl;
+      finalKey = _webKey;
+    }
+
+    if (finalUrl.isEmpty || finalKey.isEmpty) {
       debugPrint(
-        '⚠️ Supabase credentials missing (url empty=${supabaseUrl.isEmpty}, '
-        'key empty=${supabaseAnonKey.isEmpty}) — DB features unavailable.',
+        '⚠️ Supabase credentials missing (url empty=${finalUrl.isEmpty}, '
+        'key empty=${finalKey.isEmpty}) — DB features unavailable.',
       );
       return;
     }
 
-    debugPrint('🔌 Initializing Supabase with URL: $supabaseUrl');
+    debugPrint('🔌 Initializing Supabase with URL: $finalUrl');
 
     await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      url: finalUrl,
+      anonKey: finalKey,
       debug: kDebugMode,
     );
 
@@ -55,6 +100,7 @@ class SupabaseService {
     _initialized = true;
     debugPrint('✅ Supabase initialized successfully');
   }
+  // my code ends here
 
   SupabaseClient get client {
     if (!_initialized) {
@@ -340,8 +386,6 @@ class SupabaseService {
   }
 }
 
-// ------- Shared domain types (ported from local_product_database) -------
-
 class AisleProductGroup {
   final String aisle;
   final List<Product> products;
@@ -359,60 +403,6 @@ class SheetCategorySummary {
   });
 }
 
-// ------- PostgreSQL schema migration SQL (for reference / Supabase SQL Editor) -------
-
-/// Run this SQL in your Supabase project's SQL Editor to create the table:
-///
-/// ```sql
-/// CREATE TABLE scanned_products (
-///   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-///   name TEXT NOT NULL,
-///   brand TEXT,
-///   weight TEXT,
-///   estimated_price REAL NOT NULL DEFAULT 0,
-///   category TEXT NOT NULL DEFAULT 'General',
-///   barcode TEXT,
-///   aisle TEXT,
-///   planogram_date TEXT NOT NULL,
-///   sheet_name TEXT NOT NULL DEFAULT 'OGE',
-///   image_path TEXT,
-///   quantity INTEGER NOT NULL DEFAULT 1,
-///   scanned_at TEXT NOT NULL,
-///   user_id UUID REFERENCES auth.users(id) DEFAULT auth.uid(),
-///   created_at TIMESTAMPTZ DEFAULT NOW()
-/// );
-///
-/// -- Enable Row Level Security
-/// ALTER TABLE scanned_products ENABLE ROW LEVEL SECURITY;
-///
-/// -- RLS: users can only see their own data
-/// CREATE POLICY "Users can view their own products"
-///   ON scanned_products FOR SELECT
-///   USING (auth.uid() = user_id);
-///
-/// -- RLS: users can insert their own data
-/// CREATE POLICY "Users can insert their own products"
-///   ON scanned_products FOR INSERT
-///   WITH CHECK (auth.uid() = user_id);
-///
-/// -- RLS: users can update their own data
-/// CREATE POLICY "Users can update their own products"
-///   ON scanned_products FOR UPDATE
-///   USING (auth.uid() = user_id);
-///
-/// -- RLS: users can delete their own data
-/// CREATE POLICY "Users can delete their own products"
-///   ON scanned_products FOR DELETE
-///   USING (auth.uid() = user_id);
-///
-/// -- Indexes for common queries
-/// CREATE INDEX idx_scanned_products_planogram_date
-///   ON scanned_products (planogram_date DESC);
-/// CREATE INDEX idx_scanned_products_sheet_name
-///   ON scanned_products (sheet_name);
-/// CREATE INDEX idx_scanned_products_user_id
-///   ON scanned_products (user_id);
-/// ```
 class SupabaseSchema {
   /// This class exists only as documentation — run the SQL above manually.
   SupabaseSchema._();
