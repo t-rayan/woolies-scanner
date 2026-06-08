@@ -2,12 +2,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/product_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
+
+/// 🔒 Reactive Auth Provider listening to current session parameters
+// 🔒 Reactive Auth Stream Provider listening to authentication state changes live
+final authSessionProvider = StreamProvider<Session?>((ref) {
+  return SupabaseService.instance.client.auth.onAuthStateChange
+      .map((data) => data.session);
+});
 
 /// Highlighted text span helper for search results - bold yellow on matches.
 class HighlightedText extends StatelessWidget {
@@ -151,6 +159,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final datesAsync = ref.watch(planogramDatesProvider);
     final searchQuery = ref.watch(scanSearchQueryProvider);
 
+    // 🔐 Read authentication session state parameters
+    // ✅ REPLACE WITH THIS:
+    final authAsync = ref.watch(authSessionProvider);
+    final bool isAdmin = authAsync.value != null;
+
     if (_isSearching && searchQuery.trim().isNotEmpty) {
       return _buildSearchScaffold(searchQuery);
     }
@@ -194,6 +207,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onPressed: _closeSearch,
               tooltip: 'Close search',
             ),
+          // 🛠️ Context-aware navigation controller button inside the top bar tray
+          if (!_isSearching)
+            isAdmin
+                ? IconButton(
+                    icon: const Icon(Icons.logout_rounded,
+                        color: AppColors.black),
+                    tooltip: 'Admin Sign Out',
+                    onPressed: () async {
+                      await SupabaseService.instance.client.auth.signOut();
+                      ref.invalidate(
+                          authSessionProvider); // Force state updates
+                    },
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.admin_panel_settings_outlined,
+                        color: AppColors.black),
+                    tooltip: 'Admin Sign In',
+                    onPressed: () => context.push('/login'),
+                  ),
         ],
       ),
       body: dbCountAsync.when(
@@ -201,7 +233,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return datesAsync.when(
             data: (dates) {
               if (dates.isEmpty) return _buildEmptyState();
-              return _buildDateList(context, ref, dates, count);
+              return _buildDateList(context, ref, dates, count, isAdmin);
             },
             loading: () => const Center(
                 child: CircularProgressIndicator(color: AppColors.black)),
@@ -259,39 +291,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ),
-      floatingActionButton: kIsWeb
-          // Web: only show search (scan doesn't work on web due to CORS)
-          ? FloatingActionButton(
-              heroTag: 'search',
-              onPressed: _startSearch,
+      // 🛠️ Dynamic Multi-tier Float system depending on platform layout structures
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            heroTag: 'search',
+            onPressed: _startSearch,
+            backgroundColor: AppColors.black,
+            elevation: 4,
+            mini: true,
+            child: const Icon(Icons.search_rounded, color: AppColors.white),
+          ),
+          if (isAdmin) ...[
+            const SizedBox(height: 16),
+            FloatingActionButton(
+              heroTag: 'scan',
+              onPressed: () => context.push('/scanner'),
               backgroundColor: AppColors.black,
               elevation: 4,
-              child: const Icon(Icons.search_rounded, color: AppColors.white),
-            )
-          // Mobile: show both search (mini) + scan FABs
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FloatingActionButton(
-                  heroTag: 'search',
-                  onPressed: _startSearch,
-                  backgroundColor: AppColors.black,
-                  elevation: 4,
-                  mini: true,
-                  child:
-                      const Icon(Icons.search_rounded, color: AppColors.white),
-                ),
-                const SizedBox(height: 16),
-                FloatingActionButton(
-                  heroTag: 'scan',
-                  onPressed: () => context.push('/scanner'),
-                  backgroundColor: AppColors.black,
-                  elevation: 4,
-                  child:
-                      const Icon(Icons.qr_code_scanner, color: AppColors.white),
-                ),
-              ],
+              child: const Icon(Icons.qr_code_scanner, color: AppColors.white),
             ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -385,15 +408,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w500)),
           SizedBox(height: 24),
-          Text('Tip: Tap the + button to scan a promo sheet.',
+          Text('Tip: Log in as admin to scan promotional sheets.',
               style: TextStyle(color: AppColors.grey, fontSize: 12)),
         ],
       ),
     );
   }
 
-  Widget _buildDateList(
-      BuildContext context, WidgetRef ref, List<String> dates, int totalCount) {
+  Widget _buildDateList(BuildContext context, WidgetRef ref, List<String> dates,
+      int totalCount, bool isAdmin) {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -420,13 +443,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         const SizedBox(height: 24),
-        ...dates.map((date) => _buildDateFolder(context, ref, date)),
+        ...dates.map((date) => _buildDateFolder(context, ref, date, isAdmin)),
       ],
     );
   }
 
-  /// Single date folder — clicking it navigates to folder selection screen.
-  Widget _buildDateFolder(BuildContext context, WidgetRef ref, String date) {
+  /// Single date folder — delete actions scale visibility purely based on auth variables.
+  Widget _buildDateFolder(
+      BuildContext context, WidgetRef ref, String date, bool isAdmin) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -454,7 +478,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         fontWeight: FontWeight.w800,
                         color: AppColors.black)),
               ),
-              if (!kIsWeb)
+              // 🛠️ The delete tray button is locked behind the verification validation check
+              if (isAdmin)
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded,
                       color: AppColors.grey, size: 22),

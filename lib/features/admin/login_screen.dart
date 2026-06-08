@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/services/supabase_service.dart';
+import '../home/home_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // 💡 ADD THIS LINE
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -33,7 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (mounted && response.session != null) {
-        context.go('/admin');
+        ProviderScope.containerOf(context, listen: false)
+            .invalidate(authSessionProvider);
+        context.go('/');
       }
     } catch (_) {
       _showError('Incorrect passcode. Access denied.');

@@ -4,14 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:woolies_scanner/core/services/supabase_service.dart';
 
 class ClaudeService {
-  final String apiKey;
-
   static const String primaryModel = 'claude-opus-4-7';
   static const int targetMaxPixels = 2576;
 
-  ClaudeService(this.apiKey);
+  ClaudeService();
 
   static Future<Uint8List> preprocessImage(XFile file) async {
     final Uint8List rawBytes = await file.readAsBytes();
@@ -35,22 +35,33 @@ class ClaudeService {
     return jpegBytes;
   }
 
-  Future<List<Map<String, dynamic>>> analyzeImage(XFile imageFile) async {
+  // 💡 Accept the running SupabaseClient straight from your screen context parameters
+  Future<List<Map<String, dynamic>>> analyzeImage(
+      XFile imageFile, SupabaseClient supabase) async {
+    // 1. 🔒 Pull your key dynamically from the working Riverpod/Supabase instance
+    final responseData = await supabase
+        .from('system_secrets')
+        .select('secret_value')
+        .eq('id', 'ANTHROPIC_API_KEY')
+        .single();
+
+    final String secureApiKey = responseData['secret_value'] as String;
+
+    // 2. Preprocess your sheet file into memory bytes arrays (handles resizing to 2576px)
     final Uint8List processedBytes = await preprocessImage(imageFile);
     final String base64Image = base64Encode(processedBytes);
 
+    // 3. Fire the optimized payload to Claude 3.5 Sonnet
     final response = await http.post(
       Uri.parse('https://api.anthropic.com/v1/messages'),
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
+        'x-api-key': secureApiKey,
         'anthropic-version': '2023-06-01',
       },
       body: jsonEncode({
-        'model': primaryModel,
-        'max_tokens': 8192,
-        'thinking': {'type': 'adaptive'},
-        'output_config': {'effort': 'xhigh'},
+        'model': 'claude-sonnet-4-6',
+        'max_tokens': 4000, // 🎯 Balanced token limit for speed and completion
         'messages': [
           {
             'role': 'user',
@@ -65,7 +76,7 @@ class ClaudeService {
               },
               {
                 'type': 'text',
-                'text': _buildPrompt(),
+                'text': _buildPrompt(), // Uses your layout routing rules
               }
             ],
           }
@@ -73,6 +84,7 @@ class ClaudeService {
       }),
     );
 
+    // 4. Verify API response
     if (response.statusCode != 200) {
       throw Exception('Claude API Error: ${response.body}');
     }
@@ -80,20 +92,94 @@ class ClaudeService {
     final data = jsonDecode(response.body);
     String responseText = '';
     final List<dynamic> content = data['content'] as List<dynamic>;
+
     for (final block in content) {
       if (block['type'] == 'text') {
         responseText = block['text'] as String;
         break;
       }
     }
+
     if (responseText.isEmpty) {
       throw Exception('AI response contained no text block.');
     }
 
+    // 5. Run raw text output through your regex filters to build the final list
     final String authoritativeDate = _extractWcDate(responseText);
     return _parseResponse(responseText, authoritativeDate);
   }
 
+// *********** ---- Built prompt for opus ---- **************
+//   String _buildPrompt() {
+//     return '''
+// CRITICAL DATE RULE — Extract ONLY the date after "Sales Plan WC".
+// - Locate "Sales Plan WC" or "WC" at the very top of the page.
+// - Extract ONLY the date immediately after "WC" (e.g., "10/04/25").
+// - Use THIS SAME DATE for EVERY product.
+// - If you cannot find "WC", use today's date.
+
+// IMAGE CONTEXT:
+// - This image is a wide-format retail planogram sheet in Landscape orientation.
+// - The image has been pre-processed so the longest edge is exactly 2576 pixels.
+// - Use this 2576px coordinate space for all bounding box values.
+
+// LITERALISM RULE (CRITICAL):
+// - Be STRICTLY LITERAL when reading Ref / Article numbers.
+// - If a Ref number is smudge-distorted, partially hidden, or unreadable due to
+//   flash glare, output "[REDACTED]" or "?" — do NOT guess or hallucinate digits.
+// - Product names may be extracted as best-effort, but Ref numbers must be
+//   as accurate as possible.
+
+// LOW-QUALITY SCAN HANDLING:
+// This image may have: camera flash glare, paper texture, blurred/warped text.
+// 1. Prioritize Ref numbers — they are the most critical data field.
+// 2. Scan FGE boxes carefully for small text.
+// 3. Ignore scan artifacts (paper fibers, staple shadows, contrast edges).
+
+// SHEET TYPE DETECTION:
+// Look at the page title/header. Is this a:
+//   (A) BACK GONDOLA ENDS sheet → OGE type (OGE001-OGE012 boxes only)
+//   (B) FRONT GONDOLA ENDS sheet → FGE type (top displays + FGE001-FGE015)
+
+// === IF OGE (Back Gondola Ends) ===
+// Simple grid — no special-display row:
+//   [OGE001] [OGE002] [OGE003] ...through OGE012
+// Label each product with its exact box ID (e.g., "OGE001", "OGE005").
+
+// === IF FGE (Front Gondola Ends) ===
+// Two-zone layout divided by a horizontal divider line:
+
+// ROW 1 (ABOVE divider — Special Displays):
+//   [Front of Store BIN] | [ENT - Entrance] | [POS - Flexi Stand]
+
+// --- HORIZONTAL DIVIDER (STRICT BARRIER) ---
+
+// ROW 2+ (BELOW divider — Numbered FGE Boxes):
+//   [FGE001] [FGE002] [FGE003] ...through FGE015
+
+// FGE SPATIAL RULES:
+// 1. **No Sliding**: Only assign BIN/ENT/POS if that SPECIFIC header is above.
+//    NEVER pull from FGE001 to fill an empty BIN/ENT/POS.
+// 2. **Divider Barrier**: Everything below the divider = FGE001-FGE015 ONLY.
+// 3. **Missing Box**: If "BIN", "ENT", or "POS" keyword is absent → omit that aisle.
+// 4. **Row Markers**: Append "-R1" (top row) or "-R2" (numbered boxes).
+
+// OUTPUT FORMAT — ULTRA-CONCISE JSON:
+// [{"n":"...","b":"...","a":"...","d":"...","x":0,"y":0,"w":0,"h":0}]
+
+// - n = product name (exact, or best-effort if distorted)
+// - b = Ref / Article number (highest priority — use [REDACTED] or ? if unsure)
+// - a = aisle with row marker (e.g., "FGE003-R2", "BIN-R1")
+// - d = date from "Sales Plan WC" ONLY (same for ALL products)
+// - x,y = top-left pixel coordinate of this product's Ref number box
+// - w,h = width and height of the Ref number bounding box in pixels
+//   (Coordinates at 2576px resolution. Omit if uncertain; use 0 for unknown.)
+
+// Return ONLY the JSON array. No explanation, no markdown.
+// ''';
+//   }
+
+// *********** ---- Built prompt for sonnect ---- **************
   String _buildPrompt() {
     return '''
 CRITICAL DATE RULE — Extract ONLY the date after "Sales Plan WC".
@@ -102,23 +188,15 @@ CRITICAL DATE RULE — Extract ONLY the date after "Sales Plan WC".
 - Use THIS SAME DATE for EVERY product.
 - If you cannot find "WC", use today's date.
 
-IMAGE CONTEXT:
-- This image is a wide-format retail planogram sheet in Landscape orientation.
-- The image has been pre-processed so the longest edge is exactly 2576 pixels.
-- Use this 2576px coordinate space for all bounding box values.
-
 LITERALISM RULE (CRITICAL):
 - Be STRICTLY LITERAL when reading Ref / Article numbers.
-- If a Ref number is smudge-distorted, partially hidden, or unreadable due to
-  flash glare, output "[REDACTED]" or "?" — do NOT guess or hallucinate digits.
-- Product names may be extracted as best-effort, but Ref numbers must be
-  as accurate as possible.
+- If a Ref number is smudge-distorted, partially hidden, or unreadable due to flash glare, output "[REDACTED]" or "?" — do NOT guess or hallucinate digits.
+- Product names may be extracted as best-effort, but Ref numbers must be as accurate as possible.
 
 LOW-QUALITY SCAN HANDLING:
 This image may have: camera flash glare, paper texture, blurred/warped text.
 1. Prioritize Ref numbers — they are the most critical data field.
 2. Scan FGE boxes carefully for small text.
-3. Ignore scan artifacts (paper fibers, staple shadows, contrast edges).
 
 SHEET TYPE DETECTION:
 Look at the page title/header. Is this a:
@@ -132,34 +210,24 @@ Label each product with its exact box ID (e.g., "OGE001", "OGE005").
 
 === IF FGE (Front Gondola Ends) ===
 Two-zone layout divided by a horizontal divider line:
-
-ROW 1 (ABOVE divider — Special Displays):
-  [Front of Store BIN] | [ENT - Entrance] | [POS - Flexi Stand]
-
+ROW 1 (ABOVE divider — Special Displays): [Front of Store BIN] | [ENT - Entrance] | [POS - Flexi Stand]
 --- HORIZONTAL DIVIDER (STRICT BARRIER) ---
-
-ROW 2+ (BELOW divider — Numbered FGE Boxes):
-  [FGE001] [FGE002] [FGE003] ...through FGE015
+ROW 2+ (BELOW divider — Numbered FGE Boxes): [FGE001] [FGE002] [FGE003] ...through FGE015
 
 FGE SPATIAL RULES:
 1. **No Sliding**: Only assign BIN/ENT/POS if that SPECIFIC header is above.
-   NEVER pull from FGE001 to fill an empty BIN/ENT/POS.
 2. **Divider Barrier**: Everything below the divider = FGE001-FGE015 ONLY.
-3. **Missing Box**: If "BIN", "ENT", or "POS" keyword is absent → omit that aisle.
-4. **Row Markers**: Append "-R1" (top row) or "-R2" (numbered boxes).
 
 OUTPUT FORMAT — ULTRA-CONCISE JSON:
-[{"n":"...","b":"...","a":"...","d":"...","x":0,"y":0,"w":0,"h":0}]
+[{"n":"PRODUCT NAME","b":"REF NUMBER","a":"AISLE","d":"WC_DATE"}]
 
-- n = product name (exact, or best-effort if distorted)
+- n = product name (exact, uppercase, or best-effort)
 - b = Ref / Article number (highest priority — use [REDACTED] or ? if unsure)
-- a = aisle with row marker (e.g., "FGE003-R2", "BIN-R1")
+- a = aisle location code (e.g., "FGE003", "BIN", "OGE001")
 - d = date from "Sales Plan WC" ONLY (same for ALL products)
-- x,y = top-left pixel coordinate of this product's Ref number box
-- w,h = width and height of the Ref number bounding box in pixels
-  (Coordinates at 2576px resolution. Omit if uncertain; use 0 for unknown.)
 
-Return ONLY the JSON array. No explanation, no markdown.
+⚠️ CRITICAL TRUNCATION GUARD: 
+You must extract every single item on the sheet. Do NOT include bounding box pixels or extra parameters. Keep keys short so the payload never cuts off. Return ONLY the valid JSON array wrapped in markdown code blocks. No explanation.
 ''';
   }
 

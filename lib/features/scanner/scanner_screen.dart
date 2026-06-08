@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:woolies_scanner/core/services/supabase_service.dart';
 
 import '../../core/models/product_model.dart';
 import '../../core/services/claude_service.dart';
@@ -38,15 +39,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _errorMessage = null;
       });
 
-      final String apiKey = dotenv.env['ANTHROPIC_API_KEY'] ?? '';
-      if (apiKey.isEmpty) throw Exception('API Key missing from .env');
-
-      final claudeService = ClaudeService(apiKey);
+      final claudeService = ClaudeService();
 
       // Image preprocessing happens inside analyzeImage (EXIF + resize to 2576px)
       setState(() => _statusMessage = 'Analyzing sheet...');
 
-      final results = await claudeService.analyzeImage(image);
+      final results = await claudeService.analyzeImage(
+          image, ref.read(supabaseServiceProvider).client);
 
       if (results.isEmpty) {
         throw Exception(

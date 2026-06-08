@@ -109,17 +109,17 @@ final _router = GoRouter(
     GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminScreen(),
-      redirect: (context, state) {
-        // Check if our custom service wrapper has an active user session
-        final isReady = SupabaseService.instance.isReady;
-        if (!isReady) return '/login';
+      // redirect: (context, state) {
+      //   // Check if our custom service wrapper has an active user session
+      //   final isReady = SupabaseService.instance.isReady;
+      //   if (!isReady) return '/login';
 
-        final session = SupabaseService.instance.client.auth.currentSession;
-        if (session == null) {
-          return '/login'; // Kicks logged-out users to the login screen
-        }
-        return null; // Allows authenticated users through
-      },
+      //   final session = SupabaseService.instance.client.auth.currentSession;
+      //   if (session == null) {
+      //     return '/login'; // Kicks logged-out users to the login screen
+      //   }
+      //   return null; // Allows authenticated users through
+      // },
     ),
     GoRoute(
       path: '/database',
