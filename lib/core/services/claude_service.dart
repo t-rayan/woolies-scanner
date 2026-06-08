@@ -5,10 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:woolies_scanner/core/services/supabase_service.dart';
 
 class ClaudeService {
-  static const String primaryModel = 'claude-opus-4-7';
+  static const String primaryModel = 'claude-3-5-sonnet-20240620';
   static const int targetMaxPixels = 2576;
 
   ClaudeService();
@@ -37,25 +36,15 @@ class ClaudeService {
 
   Future<List<Map<String, dynamic>>> analyzeImage(
       XFile imageFile, SupabaseClient supabase) async {
-    // 1. 🔒 Pull your Anthropic API key dynamically from your working Supabase vault table
-    final responseData = await supabase
-        .from('system_secrets')
-        .select('secret_value')
-        .eq('id', 'ANTHROPIC_API_KEY')
-        .single();
-
-    final String secureApiKey = responseData['secret_value'] as String;
-
-    // 2. Preprocess your sheet file into memory byte arrays
+    // 1. Preprocess your sheet file into memory byte arrays
     final Uint8List processedBytes = await preprocessImage(imageFile);
     final String base64Image = base64Encode(processedBytes);
 
-    // 3. 🌐 TARGET YOUR FIREBASE PROXY URL
-    // TODO: Replace this placeholder string with the exact URL provided by Firebase
-    // when you run 'firebase deploy --only functions' (e.g., https://analyzesheetproxy-xxxxxx.a.run.app)
-    final String proxyUrl = 'https://analyzesheetproxy-jothe3t62a-uc.a.run.app';
+    // 2. 🌐 TARGET YOUR LIVE FIREBASE PROXY URL
+    final String proxyUrl =
+        'https://us-central1-planogram-scanner.cloudfunctions.net/analyzeSheetProxy';
 
-    // 4. Send the payload to your Cloud Function instead of Anthropic
+    // 3. Send the layout payload to your Cloud Function (Secret key is handled safely on the server side)
     final response = await http.post(
       Uri.parse(proxyUrl),
       headers: {
@@ -64,11 +53,10 @@ class ClaudeService {
       body: jsonEncode({
         'base64Image': base64Image,
         'prompt': _buildPrompt(), // Uses your layout formatting rules
-        'apiKey': secureApiKey, // Safely pass the vault key server-side
       }),
     );
 
-    // 5. Verify Proxy response status
+    // 4. Verify Proxy response status
     if (response.statusCode != 200) {
       throw Exception('Proxy Server Error: ${response.body}');
     }
@@ -76,7 +64,7 @@ class ClaudeService {
     final data = jsonDecode(response.body);
     String responseText = '';
 
-    // 6. Drill into the response structure returned by Claude via the proxy
+    // 5. Drill into the response structure returned by Claude via the proxy
     final List<dynamic> content = data['content'] as List<dynamic>;
     for (final block in content) {
       if (block['type'] == 'text') {
@@ -89,82 +77,12 @@ class ClaudeService {
       throw Exception('AI response contained no valid text blocks.');
     }
 
-    // 7. Parse the text back through your regex filters to populate the data grid
+    // 6. Parse the text back through your regex filters to populate the data grid
     final String authoritativeDate = _extractWcDate(responseText);
     return _parseResponse(responseText, authoritativeDate);
   }
 
-// *********** ---- Built prompt for opus ---- **************
-//   String _buildPrompt() {
-//     return '''
-// CRITICAL DATE RULE — Extract ONLY the date after "Sales Plan WC".
-// - Locate "Sales Plan WC" or "WC" at the very top of the page.
-// - Extract ONLY the date immediately after "WC" (e.g., "10/04/25").
-// - Use THIS SAME DATE for EVERY product.
-// - If you cannot find "WC", use today's date.
-
-// IMAGE CONTEXT:
-// - This image is a wide-format retail planogram sheet in Landscape orientation.
-// - The image has been pre-processed so the longest edge is exactly 2576 pixels.
-// - Use this 2576px coordinate space for all bounding box values.
-
-// LITERALISM RULE (CRITICAL):
-// - Be STRICTLY LITERAL when reading Ref / Article numbers.
-// - If a Ref number is smudge-distorted, partially hidden, or unreadable due to
-//   flash glare, output "[REDACTED]" or "?" — do NOT guess or hallucinate digits.
-// - Product names may be extracted as best-effort, but Ref numbers must be
-//   as accurate as possible.
-
-// LOW-QUALITY SCAN HANDLING:
-// This image may have: camera flash glare, paper texture, blurred/warped text.
-// 1. Prioritize Ref numbers — they are the most critical data field.
-// 2. Scan FGE boxes carefully for small text.
-// 3. Ignore scan artifacts (paper fibers, staple shadows, contrast edges).
-
-// SHEET TYPE DETECTION:
-// Look at the page title/header. Is this a:
-//   (A) BACK GONDOLA ENDS sheet → OGE type (OGE001-OGE012 boxes only)
-//   (B) FRONT GONDOLA ENDS sheet → FGE type (top displays + FGE001-FGE015)
-
-// === IF OGE (Back Gondola Ends) ===
-// Simple grid — no special-display row:
-//   [OGE001] [OGE002] [OGE003] ...through OGE012
-// Label each product with its exact box ID (e.g., "OGE001", "OGE005").
-
-// === IF FGE (Front Gondola Ends) ===
-// Two-zone layout divided by a horizontal divider line:
-
-// ROW 1 (ABOVE divider — Special Displays):
-//   [Front of Store BIN] | [ENT - Entrance] | [POS - Flexi Stand]
-
-// --- HORIZONTAL DIVIDER (STRICT BARRIER) ---
-
-// ROW 2+ (BELOW divider — Numbered FGE Boxes):
-//   [FGE001] [FGE002] [FGE003] ...through FGE015
-
-// FGE SPATIAL RULES:
-// 1. **No Sliding**: Only assign BIN/ENT/POS if that SPECIFIC header is above.
-//    NEVER pull from FGE001 to fill an empty BIN/ENT/POS.
-// 2. **Divider Barrier**: Everything below the divider = FGE001-FGE015 ONLY.
-// 3. **Missing Box**: If "BIN", "ENT", or "POS" keyword is absent → omit that aisle.
-// 4. **Row Markers**: Append "-R1" (top row) or "-R2" (numbered boxes).
-
-// OUTPUT FORMAT — ULTRA-CONCISE JSON:
-// [{"n":"...","b":"...","a":"...","d":"...","x":0,"y":0,"w":0,"h":0}]
-
-// - n = product name (exact, or best-effort if distorted)
-// - b = Ref / Article number (highest priority — use [REDACTED] or ? if unsure)
-// - a = aisle with row marker (e.g., "FGE003-R2", "BIN-R1")
-// - d = date from "Sales Plan WC" ONLY (same for ALL products)
-// - x,y = top-left pixel coordinate of this product's Ref number box
-// - w,h = width and height of the Ref number bounding box in pixels
-//   (Coordinates at 2576px resolution. Omit if uncertain; use 0 for unknown.)
-
-// Return ONLY the JSON array. No explanation, no markdown.
-// ''';
-//   }
-
-// *********** ---- Built prompt for sonnect ---- **************
+// *********** ---- Built prompt for sonnet ---- **************
   String _buildPrompt() {
     return '''
 CRITICAL DATE RULE — Extract ONLY the date after "Sales Plan WC".
