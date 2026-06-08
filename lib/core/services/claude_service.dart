@@ -58,6 +58,8 @@ class ClaudeService {
         'Content-Type': 'application/json',
         'x-api-key': secureApiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access':
+            'true', // 🔓 This explicitly tells Chrome to bypass the CORS block safely
       },
       body: jsonEncode({
         'model': 'claude-sonnet-4-6',
