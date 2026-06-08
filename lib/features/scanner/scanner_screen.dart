@@ -28,7 +28,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        imageQuality: 95,
+        maxWidth: 2000,
+        imageQuality: 70,
       );
 
       if (image == null) return;
