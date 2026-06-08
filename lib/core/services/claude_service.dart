@@ -38,60 +38,25 @@ class ClaudeService {
   // 💡 Accept the running SupabaseClient straight from your screen context parameters
   Future<List<Map<String, dynamic>>> analyzeImage(
       XFile imageFile, SupabaseClient supabase) async {
-    // 1. 🔒 Pull your key dynamically from the working Riverpod/Supabase instance
-    final responseData = await supabase
-        .from('system_secrets')
-        .select('secret_value')
-        .eq('id', 'ANTHROPIC_API_KEY')
-        .single();
-
-    final String secureApiKey = responseData['secret_value'] as String;
-
-    // 2. Preprocess your sheet file into memory bytes arrays (handles resizing to 2576px)
+    // 1. Preprocess your sheet file into memory bytes arrays
     final Uint8List processedBytes = await preprocessImage(imageFile);
     final String base64Image = base64Encode(processedBytes);
 
-    // 3. Fire the optimized payload to Claude 3.5 Sonnet
-    final response = await http.post(
-      Uri.parse('https://api.anthropic.com/v1/messages'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': secureApiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access':
-            'true', // 🔓 This explicitly tells Chrome to bypass the CORS block safely
+    // 2. Invoke the Supabase Edge function securely
+    // This routes the traffic safely through your authenticated DB endpoint
+    final response = await supabase.functions.invoke(
+      'analyze-sheet',
+      body: {
+        'base64Image': base64Image,
+        'prompt': _buildPrompt(),
       },
-      body: jsonEncode({
-        'model': 'claude-sonnet-4-6',
-        'max_tokens': 4000, // 🎯 Balanced token limit for speed and completion
-        'messages': [
-          {
-            'role': 'user',
-            'content': [
-              {
-                'type': 'image',
-                'source': {
-                  'type': 'base64',
-                  'media_type': 'image/jpeg',
-                  'data': base64Image,
-                },
-              },
-              {
-                'type': 'text',
-                'text': _buildPrompt(), // Uses your layout routing rules
-              }
-            ],
-          }
-        ],
-      }),
     );
 
-    // 4. Verify API response
-    if (response.statusCode != 200) {
-      throw Exception('Claude API Error: ${response.body}');
+    if (response.status != 200) {
+      throw Exception('Edge Function Error: ${response.data}');
     }
 
-    final data = jsonDecode(response.body);
+    final data = response.data;
     String responseText = '';
     final List<dynamic> content = data['content'] as List<dynamic>;
 
@@ -106,7 +71,7 @@ class ClaudeService {
       throw Exception('AI response contained no text block.');
     }
 
-    // 5. Run raw text output through your regex filters to build the final list
+    // 3. Process raw strings back through filters
     final String authoritativeDate = _extractWcDate(responseText);
     return _parseResponse(responseText, authoritativeDate);
   }
