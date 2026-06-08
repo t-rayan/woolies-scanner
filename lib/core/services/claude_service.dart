@@ -35,31 +35,49 @@ class ClaudeService {
     return jpegBytes;
   }
 
-  // 💡 Accept the running SupabaseClient straight from your screen context parameters
   Future<List<Map<String, dynamic>>> analyzeImage(
       XFile imageFile, SupabaseClient supabase) async {
-    // 1. Preprocess your sheet file into memory bytes arrays
+    // 1. 🔒 Pull your Anthropic API key dynamically from your working Supabase vault table
+    final responseData = await supabase
+        .from('system_secrets')
+        .select('secret_value')
+        .eq('id', 'ANTHROPIC_API_KEY')
+        .single();
+
+    final String secureApiKey = responseData['secret_value'] as String;
+
+    // 2. Preprocess your sheet file into memory byte arrays
     final Uint8List processedBytes = await preprocessImage(imageFile);
     final String base64Image = base64Encode(processedBytes);
 
-    // 2. Invoke the Supabase Edge function securely
-    // This routes the traffic safely through your authenticated DB endpoint
-    final response = await supabase.functions.invoke(
-      'analyze-sheet',
-      body: {
-        'base64Image': base64Image,
-        'prompt': _buildPrompt(),
+    // 3. 🌐 TARGET YOUR FIREBASE PROXY URL
+    // TODO: Replace this placeholder string with the exact URL provided by Firebase
+    // when you run 'firebase deploy --only functions' (e.g., https://analyzesheetproxy-xxxxxx.a.run.app)
+    final String proxyUrl = 'https://analyzesheetproxy-jothe3t62a-uc.a.run.app';
+
+    // 4. Send the payload to your Cloud Function instead of Anthropic
+    final response = await http.post(
+      Uri.parse(proxyUrl),
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: jsonEncode({
+        'base64Image': base64Image,
+        'prompt': _buildPrompt(), // Uses your layout formatting rules
+        'apiKey': secureApiKey, // Safely pass the vault key server-side
+      }),
     );
 
-    if (response.status != 200) {
-      throw Exception('Edge Function Error: ${response.data}');
+    // 5. Verify Proxy response status
+    if (response.statusCode != 200) {
+      throw Exception('Proxy Server Error: ${response.body}');
     }
 
-    final data = response.data;
+    final data = jsonDecode(response.body);
     String responseText = '';
-    final List<dynamic> content = data['content'] as List<dynamic>;
 
+    // 6. Drill into the response structure returned by Claude via the proxy
+    final List<dynamic> content = data['content'] as List<dynamic>;
     for (final block in content) {
       if (block['type'] == 'text') {
         responseText = block['text'] as String;
@@ -68,10 +86,10 @@ class ClaudeService {
     }
 
     if (responseText.isEmpty) {
-      throw Exception('AI response contained no text block.');
+      throw Exception('AI response contained no valid text blocks.');
     }
 
-    // 3. Process raw strings back through filters
+    // 7. Parse the text back through your regex filters to populate the data grid
     final String authoritativeDate = _extractWcDate(responseText);
     return _parseResponse(responseText, authoritativeDate);
   }
