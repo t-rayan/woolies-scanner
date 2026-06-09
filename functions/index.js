@@ -3,7 +3,11 @@ const logger = require("firebase-functions/logger");
 const corsHandler = require("cors")({ origin: true }); // 👈 Native CORS handler
 
 exports.analyzeSheetProxy = onRequest(
-  { secrets: ["CLAUDE_KEY"] }, // Removed dynamic options wrapper
+  { secrets: ["CLAUDE_KEY"] ,
+    timeoutSeconds: 300,  // 👈 5 minutes (max for v2 is 3600)
+    memory: "512MiB",     // 👈 also helps with large base64 images
+
+  }, // Removed dynamic options wrapper
   async (req, res) => {
     // Wrap the entire execution block inside the CORS handler
     return corsHandler(req, res, async () => {

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:woolies_scanner/features/admin/login_screen.dart';
+import 'package:woolies_scanner/features/cage/cage_screen.dart';
 
 import 'features/home/home_screen.dart';
 import 'features/admin/admin_screen.dart';
@@ -101,6 +102,10 @@ final _router = GoRouter(
     GoRoute(
       path: '/scanner',
       builder: (context, state) => const ScannerScreen(),
+    ),
+    GoRoute(
+      path: '/cage',
+      builder: (context, state) => const CageScreen(),
     ),
     GoRoute(
       path: '/login',

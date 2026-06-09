@@ -9,6 +9,7 @@ import '../../core/models/product_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
+import '../cage/cage_provider.dart';
 
 /// 🔒 Reactive Auth Provider listening to current session parameters
 // 🔒 Reactive Auth Stream Provider listening to authentication state changes live
@@ -295,6 +296,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 📦 UPDATED CAGE FAB WITH LIVE BADGE COUNT:
+          FloatingActionButton(
+            heroTag: 'cage',
+            onPressed: () => context.push('/cage'),
+            backgroundColor: AppColors.black,
+            elevation: 4,
+            mini: true,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final cageCount = ref.watch(cageProvider).length;
+
+                return Badge(
+                  label: Text('$cageCount'),
+                  isLabelVisible:
+                      cageCount > 0, // Only show the badge if items exist
+                  backgroundColor: Colors.red.shade700,
+                  textColor: AppColors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  textStyle:
+                      const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
+                  child: const Icon(Icons.inventory_2_rounded,
+                      color: AppColors.white, size: 18),
+                );
+              },
+            ),
+          ),
+          const SizedBox(
+              height: 16), // Adds a clean gap between Cage and Search
           FloatingActionButton(
             heroTag: 'search',
             onPressed: _startSearch,
@@ -510,7 +539,10 @@ bool _isDisabledEnd(String aisle) =>
     _disabledEnds.contains(aisle.toUpperCase());
 
 /// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
-class _SearchResultTile extends StatelessWidget {
+/// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
+/// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
+class _SearchResultTile extends ConsumerWidget {
+  // 👈 Changed to ConsumerWidget
   final Product product;
   final String query;
   final String displayAisle;
@@ -522,7 +554,8 @@ class _SearchResultTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 👈 Added WidgetRef ref here
     final refs =
         product.barcode?.split(',').map((e) => e.trim()).toList() ?? [];
     final isEnt = displayAisle.startsWith('ENT');
@@ -581,21 +614,67 @@ class _SearchResultTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          // Aisle badge on the right (consistent with folder search)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? AppColors.grey
-                  : (isEnt ? AppColors.black : AppColors.darkGrey),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(displayAisle,
-                style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: disabled
+                      ? AppColors.grey
+                      : (isEnt ? AppColors.black : AppColors.darkGrey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(displayAisle,
+                    style: const TextStyle(
+                        color: AppColors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5)),
+              ),
+              if (!disabled) ...[
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: () {
+                    // 🟢 ADD TO CAGE PROVIDER LOGIC:
+                    ref.read(cageProvider.notifier).addToCage(product);
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content:
+                            Text('${product.name.toUpperCase()} ADDED TO CAGE'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.black,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_box_rounded,
+                            size: 14, color: AppColors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'CAGE',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.white),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
