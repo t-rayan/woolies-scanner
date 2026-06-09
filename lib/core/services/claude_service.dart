@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ClaudeService {
-  static const String primaryModel = 'claude-3-5-sonnet-20240620';
+  static const String primaryModel = 'claude-opus-4-6';
   static const int targetMaxPixels = 2576;
 
   ClaudeService();
