@@ -492,6 +492,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppColors.white,
+            // color: Colors.green.shade800,
             border: Border.all(color: AppColors.lightGrey, width: 1.5),
             borderRadius: BorderRadius.circular(16),
           ),
@@ -581,11 +582,11 @@ class _SearchResultTile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 HighlightedText(
-                  text: product.name.toUpperCase(),
+                  text: product.name,
                   query: query.toUpperCase(),
                   style: TextStyle(
                       fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                      fontSize: 12,
                       color: disabled ? AppColors.grey : AppColors.black),
                 ),
                 if (disabled)
@@ -621,15 +622,17 @@ class _SearchResultTile extends ConsumerWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
-                  color: disabled
-                      ? AppColors.grey
-                      : (isEnt ? AppColors.black : AppColors.darkGrey),
+                  // color: disabled
+                  //     ? AppColors.grey
+                  //     : (isEnt ? AppColors.black : AppColors.darkGrey),
+                  color: Colors.blue.shade900, // 🔵 Changed to Deep Blue
+
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(displayAisle,
                     style: const TextStyle(
                         color: AppColors.white,
-                        fontSize: 15,
+                        fontSize: 12,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5)),
               ),
@@ -648,26 +651,29 @@ class _SearchResultTile extends ConsumerWidget {
                       ),
                     );
                   },
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.black,
-                      borderRadius: BorderRadius.circular(6),
+                      // color: Colors.grey.shade500,
+                      border: Border.all(
+                          color: AppColors.grey.withValues(alpha: 0.2)),
+
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.add_box_rounded,
-                            size: 14, color: AppColors.white),
+                            size: 15, color: AppColors.black),
                         SizedBox(width: 4),
                         Text(
                           'CAGE',
                           style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.white),
+                              color: AppColors.black),
                         ),
                       ],
                     ),
@@ -691,18 +697,20 @@ class _HomeRefChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.lightGrey,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.grey.withValues(alpha: 0.2)),
-      ),
+      // padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      // decoration: BoxDecoration(
+      //   color: AppColors.lightGrey,
+      //   borderRadius: BorderRadius.circular(4),
+      //   border: Border.all(color: AppColors.grey.withValues(alpha: 0.2)),
+      // ),
       child: query.isNotEmpty && ref.toLowerCase().contains(query.toLowerCase())
           ? HighlightedText(
               text: ref,
               query: query,
               style: const TextStyle(
                   fontSize: 10,
+                  decoration: TextDecoration.underline, // 👈 Add this line
+
                   fontWeight: FontWeight.w900,
                   color: AppColors.black),
             )
@@ -710,6 +718,8 @@ class _HomeRefChip extends StatelessWidget {
               style: const TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
+                  decoration: TextDecoration.underline, // 👈 Add this line
+
                   color: AppColors.black)),
     );
   }
