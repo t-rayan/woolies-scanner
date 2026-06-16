@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +9,9 @@ import '../../core/models/product_model.dart';
 
 import '../../core/services/supabase_service.dart';
 import '../../features/home/home_screen.dart';
-import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
+import '../../widgets/search_fab_button.dart';
+import '../../widgets/cage_fab_button.dart';
 
 /// Ends that don't belong to this store — shown as disabled/grayed out.
 const _disabledEnds = <String>{'FGE011', 'FGE012', 'OGE011', 'OGE012'};
@@ -30,95 +30,10 @@ class ProductListScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductListScreenState extends ConsumerState<ProductListScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  bool _searchActive = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
-    _searchFocusNode.addListener(_onFocusChanged);
-  }
-
-  @override
-  void dispose() {
-    _searchFocusNode.removeListener(_onFocusChanged);
-    _searchController.removeListener(_onSearchChanged);
-    _searchFocusNode.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    ref.read(scanSearchQueryProvider.notifier).state = _searchController.text;
-  }
-
-  void _onFocusChanged() {
-    if (!_searchFocusNode.hasFocus &&
-        _searchController.text.isEmpty &&
-        _searchActive) {
-      setState(() => _searchActive = false);
-    }
-  }
-
-  void _activateSearch() {
-    setState(() => _searchActive = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _searchFocusNode.requestFocus();
-    });
-  }
-
-  void _deactivateSearch() {
-    _searchFocusNode.unfocus();
-    _searchController.clear();
-    ref.read(scanSearchQueryProvider.notifier).state = '';
-    setState(() => _searchActive = false);
-  }
-
-  Future<void> _deleteSheetCategory(
-      String date, SheetCategorySummary summary) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('DELETE ALL DATA',
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Text(
-          'Delete all ${summary.displayLabel} products from $date?\n\n'
-          '${summary.productCount} items will be permanently removed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child:
-                const Text('CANCEL', style: TextStyle(color: AppColors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('DELETE',
-                style:
-                    TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await ref
-          .read(supabaseServiceProvider)
-          .deleteByDateAndSheet(date, summary.sheetName);
-      ref.invalidate(planogramDatesProvider);
-      ref.invalidate(totalDatabaseItemsProvider);
-      ref.invalidate(groupedCountsProvider(date));
-      if (mounted) setState(() {});
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final String cleanDate = Uri.decodeComponent(widget.date ?? '').trim();
     final String cleanSheet = (widget.sheet ?? '').toUpperCase().trim();
-    final searchQuery = ref.watch(scanSearchQueryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -126,63 +41,35 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         centerTitle: true,
-        title: _searchActive
-            ? TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                autofocus: true,
-                style: const TextStyle(
-                    color: AppColors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600),
-                decoration: const InputDecoration(
-                  hintText: 'Search products...',
-                  hintStyle: TextStyle(color: AppColors.grey, fontSize: 14),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              )
-            : Text(
-                cleanDate.toUpperCase(),
-                style: const TextStyle(
-                    color: AppColors.black,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 16),
-              ),
+        title: Text(
+          cleanDate.toUpperCase(),
+          style: const TextStyle(
+              color: AppColors.black,
+              fontWeight: FontWeight.w900,
+              fontSize: 16),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: AppColors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          if (_searchActive)
-            IconButton(
-              icon: const Icon(Icons.close, color: AppColors.black),
-              onPressed: _deactivateSearch,
-              tooltip: 'Close search',
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.search_rounded, color: AppColors.black),
-              onPressed: _activateSearch,
-              tooltip: 'Search',
-            ),
+      ),
+      body: _buildBody(cleanDate, cleanSheet),
+      floatingActionButton: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CageFabButton(),
+          SizedBox(height: 16),
+          SearchFabButton(),
         ],
       ),
-      body: _buildBody(cleanDate, cleanSheet, searchQuery),
     );
   }
 
-  Widget _buildBody(String date, String sheet, String searchQuery) {
+  Widget _buildBody(String date, String sheet) {
     // If sheet IS specified, show the products
-    if (sheet.isNotEmpty && searchQuery.trim().isEmpty) {
+    if (sheet.isNotEmpty) {
       return _buildSheetView(date: date, sheet: sheet);
-    }
-
-    // If search is active, show search results
-    if (searchQuery.trim().isNotEmpty) {
-      return _buildSearchResults(searchQuery);
     }
 
     // No sheet specified — show folder selection (OGE / FGE cards)
@@ -328,28 +215,6 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
       error: (e, _) => Center(child: Text('Error: $e')),
     );
   }
-
-  Widget _buildSearchResults(String query) {
-    final searchAsync = ref.watch(searchProductsProvider);
-
-    return searchAsync.when(
-      data: (products) {
-        if (products.isEmpty)
-          return const Center(child: Text('NO MATCHES FOUND'));
-        return ListView.separated(
-          padding: const EdgeInsets.all(24),
-          itemCount: products.length,
-          separatorBuilder: (_, __) =>
-              const Divider(color: AppColors.lightGrey),
-          itemBuilder: (context, index) => _ProductTile(
-              product: products[index], query: query, showAisle: true),
-        );
-      },
-      loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.black)),
-      error: (_, __) => const Center(child: Text('Search error')),
-    );
-  }
 }
 
 class _AisleCard extends StatelessWidget {
@@ -492,11 +357,9 @@ class _AisleCard extends StatelessWidget {
 class _ProductTile extends StatelessWidget {
   final Product product;
   final String query;
-  final bool showAisle;
   const _ProductTile({
     required this.product,
     this.query = '',
-    this.showAisle = false,
   });
 
   @override
@@ -506,7 +369,6 @@ class _ProductTile extends StatelessWidget {
     final displayAisle = product.aisle?.toUpperCase() ??
         product.sheetName?.toUpperCase() ??
         'GEN';
-    final isEnt = displayAisle.startsWith('ENT');
     final disabled = _isDisabledEnd(displayAisle);
 
     return Column(
@@ -550,24 +412,6 @@ class _ProductTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (showAisle)
-              // Aisle badge — only shown in search results
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: disabled
-                      ? AppColors.grey
-                      : (isEnt ? AppColors.black : AppColors.darkGrey),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(displayAisle,
-                    style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5)),
-              ),
           ],
         ),
         if (!disabled) ...[

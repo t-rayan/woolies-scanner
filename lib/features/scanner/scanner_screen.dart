@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_colors.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +11,8 @@ import '../../core/models/product_model.dart';
 import '../../core/services/claude_service.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
+import '../../widgets/cage_fab_button.dart';
+import '../../widgets/search_fab_button.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({super.key});
@@ -127,10 +130,18 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CageFabButton(),
+          const SizedBox(height: 16),
+          const SearchFabButton(),
+        ],
+      ),
       appBar: AppBar(
         title: const Text('NEW SCAN',
             style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.lightGrey,
         foregroundColor: Colors.black,
         elevation: 0,
       ),

@@ -11,6 +11,7 @@ import 'features/home/home_screen.dart';
 import 'features/admin/admin_screen.dart';
 import 'features/products/product_list_screen.dart';
 import 'features/scanner/scanner_screen.dart';
+import 'features/search/search_screen.dart';
 import 'core/constants/app_colors.dart';
 import 'core/services/supabase_service.dart';
 
@@ -134,6 +135,10 @@ final _router = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/search',
+      builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
       path: '/error',
       builder: (context, state) => RouterErrorScreen(
         message: switch (state.uri.queryParameters['code']) {
@@ -163,7 +168,7 @@ class WooliesApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.white,
         appBarTheme: const AppBarTheme(
-          backgroundColor: AppColors.white,
+          backgroundColor: AppColors.lightGrey,
           foregroundColor: AppColors.black,
           elevation: 0,
           centerTitle: true,

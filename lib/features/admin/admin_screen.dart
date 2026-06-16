@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/constants/app_colors.dart';
 import '../../core/services/supabase_service.dart';
+import '../../widgets/cage_fab_button.dart';
+import '../../widgets/search_fab_button.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -9,6 +12,14 @@ class AdminScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CageFabButton(),
+          const SizedBox(height: 16),
+          const SearchFabButton(),
+        ],
+      ),
       appBar: AppBar(
         title: const Text(
           'ADMIN',

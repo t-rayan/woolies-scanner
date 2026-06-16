@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import 'cage_provider.dart';
+import '../../widgets/search_fab_button.dart';
 
 class CageScreen extends ConsumerWidget {
   const CageScreen({super.key});
@@ -13,6 +14,7 @@ class CageScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: const SearchFabButton(),
       appBar: AppBar(
         title: const Text(
           'CAGE PICKING LIST',
@@ -24,7 +26,7 @@ class CageScreen extends ConsumerWidget {
           ),
         ),
         centerTitle: false,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.lightGrey,
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.black),
         actions: [

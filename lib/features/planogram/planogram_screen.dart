@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/planogram_model.dart';
 import 'planogram_provider.dart';
+import '../../widgets/search_fab_button.dart';
 
 class PlanogramScreen extends ConsumerStatefulWidget {
   const PlanogramScreen({super.key});
@@ -28,9 +29,7 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
 
       setState(() => _isProcessing = true);
 
-      await ref
-          .read(planogramProvider.notifier)
-          .processImage(image);
+      await ref.read(planogramProvider.notifier).processImage(image);
 
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -49,7 +48,7 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.lightGrey,
         elevation: 0,
         title: const Text(
           'PLANOGRAM',
@@ -94,6 +93,7 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
         ),
         error: (error, _) => _buildErrorState(error.toString()),
       ),
+      floatingActionButton: const SearchFabButton(),
     );
   }
 
@@ -134,7 +134,8 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
               label: const Text('UPLOAD SHEET',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -157,13 +158,17 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 64, color: Colors.red),
+            const Icon(Icons.error_outline_rounded,
+                size: 64, color: Colors.red),
             const SizedBox(height: 16),
             const Text('PARSE FAILED',
                 style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.w900, fontSize: 18)),
+                    color: Colors.red,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18)),
             const SizedBox(height: 8),
-            Text(displayMessage, textAlign: TextAlign.center,
+            Text(displayMessage,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red, fontSize: 13)),
             const SizedBox(height: 32),
             ElevatedButton.icon(
@@ -172,7 +177,8 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
               label: const Text('TRY AGAIN',
                   style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
               ),
@@ -202,7 +208,9 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
           const SizedBox(width: 8),
           Text(planogram.planogramDate,
               style: const TextStyle(
-                  color: AppColors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  color: AppColors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13)),
           const Spacer(),
           _headerChip('${planogram.totalProducts} ITEMS'),
           const SizedBox(width: 8),
@@ -221,7 +229,9 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
       ),
       child: Text(label,
           style: const TextStyle(
-              color: AppColors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+              color: AppColors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold)),
     );
   }
 
@@ -255,8 +265,7 @@ class _PlanogramScreenState extends ConsumerState<PlanogramScreen> {
               );
             },
           ),
-          if (_selectedAisleId != null)
-            _buildSelectedAisleDetail(planogram),
+          if (_selectedAisleId != null) _buildSelectedAisleDetail(planogram),
         ],
       ),
     );
@@ -279,7 +288,8 @@ class _AisleGridTile extends StatelessWidget {
   final PlanogramAisle aisle;
   final bool isSelected;
   final VoidCallback onTap;
-  const _AisleGridTile({required this.aisle, required this.isSelected, required this.onTap});
+  const _AisleGridTile(
+      {required this.aisle, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -370,7 +380,8 @@ class _AisleDetailCard extends StatelessWidget {
                         fontSize: 16)),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -429,7 +440,8 @@ class _ShelfRow extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.horizontal_rule, color: AppColors.white, size: 12),
+                const Icon(Icons.horizontal_rule,
+                    color: AppColors.white, size: 12),
                 const SizedBox(width: 6),
                 Text('SHELF ${shelf.level}',
                     style: const TextStyle(
@@ -438,7 +450,8 @@ class _ShelfRow extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5)),
                 const Spacer(),
-                Text('${shelf.products.length} product${shelf.products.length == 1 ? '' : 's'}',
+                Text(
+                    '${shelf.products.length} product${shelf.products.length == 1 ? '' : 's'}',
                     style: TextStyle(
                         color: AppColors.white.withValues(alpha: 0.6),
                         fontSize: 9,
@@ -451,7 +464,9 @@ class _ShelfRow extends StatelessWidget {
               padding: EdgeInsets.all(12),
               child: Text('No products listed',
                   style: TextStyle(
-                      color: AppColors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
+                      color: AppColors.grey,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic)),
             )
           else
             Padding(
@@ -469,7 +484,8 @@ class _ShelfRow extends StatelessWidget {
                           if (isMultiColumn)
                             Container(
                               margin: const EdgeInsets.only(right: 10, top: 2),
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 2),
                               decoration: BoxDecoration(
                                 color: AppColors.black.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4),

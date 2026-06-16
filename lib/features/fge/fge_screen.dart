@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/fge_model.dart';
 import 'fge_provider.dart';
+import '../../widgets/cage_fab_button.dart';
+import '../../widgets/search_fab_button.dart';
 
 class FgeScreen extends ConsumerStatefulWidget {
   const FgeScreen({super.key});
@@ -39,9 +41,7 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
       _searchController.clear();
       _expandedSectionId = null;
 
-      await ref
-          .read(fgePlanogramProvider.notifier)
-          .processImage(image);
+      await ref.read(fgePlanogramProvider.notifier).processImage(image);
 
       if (mounted) setState(() => _isProcessing = false);
     } catch (e) {
@@ -56,6 +56,14 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CageFabButton(),
+          const SizedBox(height: 16),
+          const SearchFabButton(),
+        ],
+      ),
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
@@ -400,9 +408,10 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
                       color: AppColors.black)),
             ),
             const SizedBox(width: 8),
-            Icon(isExpanded
-                ? Icons.keyboard_arrow_up_rounded
-                : Icons.keyboard_arrow_down_rounded,
+            Icon(
+                isExpanded
+                    ? Icons.keyboard_arrow_up_rounded
+                    : Icons.keyboard_arrow_down_rounded,
                 color: AppColors.grey),
           ],
         ),
@@ -453,7 +462,9 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         padding: EdgeInsets.all(16),
         child: Text('No shelf data available',
             style: TextStyle(
-                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
+                color: AppColors.grey,
+                fontSize: 12,
+                fontStyle: FontStyle.italic)),
       );
     }
     return Padding(
@@ -475,7 +486,9 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         padding: EdgeInsets.all(16),
         child: Text('No items listed',
             style: TextStyle(
-                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
+                color: AppColors.grey,
+                fontSize: 12,
+                fontStyle: FontStyle.italic)),
       );
     }
     return Padding(
@@ -540,7 +553,9 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
         padding: EdgeInsets.all(16),
         child: Text('No items listed',
             style: TextStyle(
-                color: AppColors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
+                color: AppColors.grey,
+                fontSize: 12,
+                fontStyle: FontStyle.italic)),
       );
     }
     return Padding(
@@ -560,10 +575,12 @@ class _FgeScreenState extends ConsumerState<FgeScreen> {
                 children: [
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: const BoxDecoration(
                       color: AppColors.black,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(8)),
                     ),
                     child: Text(entry.key.toUpperCase().replaceAll('_', ' '),
                         style: const TextStyle(
@@ -620,7 +637,8 @@ class _ShelfWidget extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.horizontal_rule, color: AppColors.white, size: 12),
+                const Icon(Icons.horizontal_rule,
+                    color: AppColors.white, size: 12),
                 const SizedBox(width: 6),
                 Text('SHELF ${shelf.level}',
                     style: const TextStyle(
@@ -629,7 +647,8 @@ class _ShelfWidget extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5)),
                 const Spacer(),
-                Text('${shelf.items.length} item${shelf.items.length == 1 ? '' : 's'}',
+                Text(
+                    '${shelf.items.length} item${shelf.items.length == 1 ? '' : 's'}',
                     style: TextStyle(
                         color: AppColors.white.withValues(alpha: 0.6),
                         fontSize: 9,
@@ -642,7 +661,9 @@ class _ShelfWidget extends StatelessWidget {
               padding: EdgeInsets.all(12),
               child: Text('Empty shelf',
                   style: TextStyle(
-                      color: AppColors.grey, fontSize: 11, fontStyle: FontStyle.italic)),
+                      color: AppColors.grey,
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic)),
             )
           else
             Padding(
@@ -695,7 +716,8 @@ class _ItemRow extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 8,
                       fontWeight: FontWeight.w900,
-                      color: item.isRemoved ? Colors.red[800] : Colors.blue[800])),
+                      color:
+                          item.isRemoved ? Colors.red[800] : Colors.blue[800])),
             ),
           ),
         if (item.position != 'default')
@@ -708,7 +730,9 @@ class _ItemRow extends StatelessWidget {
             ),
             child: Text(_shortPosition(item.position),
                 style: const TextStyle(
-                    fontSize: 8, fontWeight: FontWeight.w900, color: AppColors.grey)),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.grey)),
           ),
         Expanded(
           child: Column(
@@ -719,7 +743,8 @@ class _ItemRow extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: item.isRemoved ? Colors.red[700] : AppColors.black,
-                      decoration: item.isRemoved ? TextDecoration.lineThrough : null)),
+                      decoration:
+                          item.isRemoved ? TextDecoration.lineThrough : null)),
               const SizedBox(height: 4),
               _RefChip(ref: item.ref),
             ],
@@ -731,14 +756,20 @@ class _ItemRow extends StatelessWidget {
 
   String _shortPosition(String pos) {
     switch (pos.toLowerCase()) {
-      case 'top': return 'TOP';
-      case 'middle': return 'MID';
-      case 'bottom': return 'BTM';
+      case 'top':
+        return 'TOP';
+      case 'middle':
+        return 'MID';
+      case 'bottom':
+        return 'BTM';
       case 'left_vertical':
-      case 'left_stack': return 'L';
+      case 'left_stack':
+        return 'L';
       case 'right_vertical':
-      case 'right_stack': return 'R';
-      default: return pos.substring(0, 1).toUpperCase();
+      case 'right_stack':
+        return 'R';
+      default:
+        return pos.substring(0, 1).toUpperCase();
     }
   }
 }
@@ -795,7 +826,9 @@ class _StatChip extends StatelessWidget {
       ),
       child: Text(label,
           style: const TextStyle(
-              color: AppColors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+              color: AppColors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.bold)),
     );
   }
 }

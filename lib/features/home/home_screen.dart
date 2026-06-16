@@ -1,15 +1,14 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/models/product_model.dart';
 import '../../core/services/supabase_service.dart';
 import '../products/product_database_provider.dart';
 import '../products/product_provider.dart';
-import '../cage/cage_provider.dart';
+import '../../widgets/search_fab_button.dart';
+import '../../widgets/cage_fab_button.dart';
 
 /// 🔒 Reactive Auth Provider listening to current session parameters
 // 🔒 Reactive Auth Stream Provider listening to authentication state changes live
@@ -76,50 +75,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  bool _isSearching = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController.addListener(_onSearchChanged);
-    _searchFocusNode.addListener(_onFocusChanged);
-  }
-
-  @override
-  void dispose() {
-    _searchFocusNode.removeListener(_onFocusChanged);
-    _searchController.removeListener(_onSearchChanged);
-    _searchFocusNode.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    ref.read(scanSearchQueryProvider.notifier).state = _searchController.text;
-  }
-
-  void _onFocusChanged() {
-    if (!_searchFocusNode.hasFocus && _searchController.text.isEmpty) {
-      setState(() => _isSearching = false);
-    }
-  }
-
-  void _startSearch() {
-    setState(() => _isSearching = true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _searchFocusNode.requestFocus();
-    });
-  }
-
-  void _closeSearch() {
-    _searchFocusNode.unfocus();
-    _searchController.clear();
-    ref.read(scanSearchQueryProvider.notifier).state = '';
-    setState(() => _isSearching = false);
-  }
-
   Future<void> _deleteEntireDate(
       BuildContext context, WidgetRef ref, String date) async {
     final confirmed = await showDialog<bool>(
@@ -158,75 +113,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final dbCountAsync = ref.watch(totalDatabaseItemsProvider);
     final datesAsync = ref.watch(planogramDatesProvider);
-    final searchQuery = ref.watch(scanSearchQueryProvider);
 
     // 🔐 Read authentication session state parameters
-    // ✅ REPLACE WITH THIS:
     final authAsync = ref.watch(authSessionProvider);
     final bool isAdmin = authAsync.value != null;
-
-    if (_isSearching && searchQuery.trim().isNotEmpty) {
-      return _buildSearchScaffold(searchQuery);
-    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                autofocus: true,
-                style: const TextStyle(
-                    color: AppColors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600),
-                decoration: const InputDecoration(
-                  hintText: 'Search all products...',
-                  hintStyle: TextStyle(color: AppColors.grey, fontSize: 14),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              )
-            : const Text(
-                'WOOLIES SCANNER',
-                style: TextStyle(
-                  color: AppColors.black,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.2,
-                  fontSize: 20,
-                ),
-              ),
+        title: const Text(
+          'WOOLIES SCANNER',
+          style: TextStyle(
+            color: AppColors.black,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+            fontSize: 20,
+          ),
+        ),
         centerTitle: false,
         backgroundColor: AppColors.white,
         elevation: 0,
         actions: [
-          if (_isSearching)
-            IconButton(
-              icon: const Icon(Icons.close, color: AppColors.black),
-              onPressed: _closeSearch,
-              tooltip: 'Close search',
-            ),
-          // 🛠️ Context-aware navigation controller button inside the top bar tray
-          if (!_isSearching)
-            isAdmin
-                ? IconButton(
-                    icon: const Icon(Icons.logout_rounded,
-                        color: AppColors.black),
-                    tooltip: 'Admin Sign Out',
-                    onPressed: () async {
-                      await SupabaseService.instance.client.auth.signOut();
-                      ref.invalidate(
-                          authSessionProvider); // Force state updates
-                    },
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.admin_panel_settings_outlined,
-                        color: AppColors.black),
-                    tooltip: 'Admin Sign In',
-                    onPressed: () => context.push('/login'),
-                  ),
+          isAdmin
+              ? IconButton(
+                  icon:
+                      const Icon(Icons.logout_rounded, color: AppColors.black),
+                  tooltip: 'Admin Sign Out',
+                  onPressed: () async {
+                    await SupabaseService.instance.client.auth.signOut();
+                    ref.invalidate(authSessionProvider);
+                  },
+                )
+              : IconButton(
+                  icon: const Icon(Icons.admin_panel_settings_outlined,
+                      color: AppColors.black),
+                  tooltip: 'Admin Sign In',
+                  onPressed: () => context.push('/login'),
+                ),
         ],
       ),
       body: dbCountAsync.when(
@@ -296,42 +219,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 📦 UPDATED CAGE FAB WITH LIVE BADGE COUNT:
-          FloatingActionButton(
-            heroTag: 'cage',
-            onPressed: () => context.push('/cage'),
-            backgroundColor: AppColors.black,
-            elevation: 4,
-            mini: true,
-            child: Consumer(
-              builder: (context, ref, child) {
-                final cageCount = ref.watch(cageProvider).length;
-
-                return Badge(
-                  label: Text('$cageCount'),
-                  isLabelVisible:
-                      cageCount > 0, // Only show the badge if items exist
-                  backgroundColor: Colors.red.shade700,
-                  textColor: AppColors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  textStyle:
-                      const TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                  child: const Icon(Icons.inventory_2_rounded,
-                      color: AppColors.white, size: 18),
-                );
-              },
-            ),
-          ),
-          const SizedBox(
-              height: 16), // Adds a clean gap between Cage and Search
-          FloatingActionButton(
-            heroTag: 'search',
-            onPressed: _startSearch,
-            backgroundColor: AppColors.black,
-            elevation: 4,
-            mini: true,
-            child: const Icon(Icons.search_rounded, color: AppColors.white),
-          ),
+          const CageFabButton(),
+          const SizedBox(height: 16),
+          const SearchFabButton(),
           if (isAdmin) ...[
             const SizedBox(height: 16),
             FloatingActionButton(
@@ -343,82 +233,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildSearchScaffold(String query) {
-    final searchAsync = ref.watch(searchProductsProvider);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        elevation: 0,
-        title: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          autofocus: true,
-          style: const TextStyle(
-              color: AppColors.black,
-              fontSize: 16,
-              fontWeight: FontWeight.w600),
-          decoration: const InputDecoration(
-            hintText: 'Search all products...',
-            hintStyle: TextStyle(color: AppColors.grey, fontSize: 14),
-            border: InputBorder.none,
-            isDense: true,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close, color: AppColors.black),
-            onPressed: _closeSearch,
-            tooltip: 'Close search',
-          ),
-        ],
-      ),
-      body: searchAsync.when(
-        data: (products) {
-          if (products.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.search_off_rounded,
-                      size: 64, color: AppColors.lightGrey),
-                  const SizedBox(height: 16),
-                  const Text('NO MATCHES FOUND',
-                      style: TextStyle(
-                          color: AppColors.grey,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16)),
-                  const SizedBox(height: 8),
-                  Text('No products match "$query"',
-                      style:
-                          const TextStyle(color: AppColors.grey, fontSize: 13)),
-                ],
-              ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(24),
-            itemCount: products.length,
-            separatorBuilder: (_, __) =>
-                const Divider(color: AppColors.lightGrey, height: 20),
-            itemBuilder: (context, index) {
-              final product = products[index];
-              final displayAisle = product.aisle?.toUpperCase() ??
-                  product.sheetName?.toUpperCase() ??
-                  'GEN';
-              return _SearchResultTile(
-                  product: product, query: query, displayAisle: displayAisle);
-            },
-          );
-        },
-        loading: () => const Center(
-            child: CircularProgressIndicator(color: AppColors.black)),
-        error: (_, __) => const Center(child: Text('Search error')),
       ),
     );
   }
@@ -531,196 +345,3 @@ final groupedCountsProvider =
   final svc = ref.read(supabaseServiceProvider);
   return svc.fetchGroupedCountsByDate(date);
 });
-
-/// Ends that don't belong to this store — shown as disabled/grayed out.
-const _disabledEnds = <String>{'FGE011', 'FGE012', 'OGE011', 'OGE012'};
-
-/// Returns true if the aisle ID is a disabled end (not belonging to this store).
-bool _isDisabledEnd(String aisle) =>
-    _disabledEnds.contains(aisle.toUpperCase());
-
-/// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
-/// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
-/// A search result tile with yellow-highlighted matching text and prominent aisle badge (B&W).
-class _SearchResultTile extends ConsumerWidget {
-  // 👈 Changed to ConsumerWidget
-  final Product product;
-  final String query;
-  final String displayAisle;
-
-  const _SearchResultTile({
-    required this.product,
-    required this.query,
-    required this.displayAisle,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 👈 Added WidgetRef ref here
-    final refs =
-        product.barcode?.split(',').map((e) => e.trim()).toList() ?? [];
-    final isEnt = displayAisle.startsWith('ENT');
-    final disabled = _isDisabledEnd(displayAisle);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: disabled ? AppColors.lightGrey : AppColors.white,
-        border: Border.all(
-          color: disabled
-              ? AppColors.grey.withValues(alpha: 0.3)
-              : AppColors.lightGrey,
-          width: 1.5,
-        ),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                HighlightedText(
-                  text: product.name,
-                  query: query.toUpperCase(),
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 12,
-                      color: disabled ? AppColors.grey : AppColors.black),
-                ),
-                if (disabled)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Text(
-                      'This end does not belong to this store',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.grey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                if (refs.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: refs
-                        .map((ref) => _HomeRefChip(ref: ref, query: query))
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  // color: disabled
-                  //     ? AppColors.grey
-                  //     : (isEnt ? AppColors.black : AppColors.darkGrey),
-                  color: Colors.blue.shade900, // 🔵 Changed to Deep Blue
-
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(displayAisle,
-                    style: const TextStyle(
-                        color: AppColors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5)),
-              ),
-              if (!disabled) ...[
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () {
-                    // 🟢 ADD TO CAGE PROVIDER LOGIC:
-                    ref.read(cageProvider.notifier).addToCage(product);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content:
-                            Text('${product.name.toUpperCase()} ADDED TO CAGE'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      // color: Colors.grey.shade500,
-                      border: Border.all(
-                          color: AppColors.grey.withValues(alpha: 0.2)),
-
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_box_rounded,
-                            size: 15, color: AppColors.black),
-                        SizedBox(width: 4),
-                        Text(
-                          'CAGE',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.black),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Ref chip with optional highlight for search matches.
-class _HomeRefChip extends StatelessWidget {
-  final String ref;
-  final String query;
-  const _HomeRefChip({required this.ref, this.query = ''});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      // padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      // decoration: BoxDecoration(
-      //   color: AppColors.lightGrey,
-      //   borderRadius: BorderRadius.circular(4),
-      //   border: Border.all(color: AppColors.grey.withValues(alpha: 0.2)),
-      // ),
-      child: query.isNotEmpty && ref.toLowerCase().contains(query.toLowerCase())
-          ? HighlightedText(
-              text: ref,
-              query: query,
-              style: const TextStyle(
-                  fontSize: 10,
-                  decoration: TextDecoration.underline, // 👈 Add this line
-
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.black),
-            )
-          : Text(ref,
-              style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  decoration: TextDecoration.underline, // 👈 Add this line
-
-                  color: AppColors.black)),
-    );
-  }
-}
