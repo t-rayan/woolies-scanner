@@ -71,8 +71,10 @@ class PlanogramParser {
 
 CRITICAL — DATE EXTRACTION RULE:
 Look at the VERY TOP HEADER of the sheet. Find the exact text "Sales Plan WC" or "Sales Plan W/C".
-The date immediately following that text IS the planogram_date (e.g., "07/05/25").
+The date immediately following that text IS the planogram_date.
+Example format: if it says "WC 07/05/26", extract "07/05/26".
 Do NOT guess the date from any other numbers on the sheet. Only use the date after "Sales Plan WC".
+Note: We are currently in the year 2026, so expect the year to reflect 2026 ('26).
 
 SECTION IDENTIFICATION:
 This sheet contains 12 sections. Identify ALL of the following:
