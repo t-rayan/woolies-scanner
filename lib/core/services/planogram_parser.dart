@@ -69,45 +69,77 @@ class PlanogramParser {
   String _buildPrompt() {
     return '''You are analyzing a Woolworths "Weekly Sales Plan" (Planogram) sheet for nightfill workers.
 
-
-CRITICAL CONTEXT:
-
 CRITICAL — DATE EXTRACTION RULE:
 Look at the VERY TOP HEADER of the sheet. Find the exact text "Sales Plan WC" or "Sales Plan W/C".
 The date immediately following that text IS the planogram_date (e.g., "07/05/25").
 Do NOT guess the date from any other numbers on the sheet. Only use the date after "Sales Plan WC".
 
+SECTION IDENTIFICATION:
+This sheet contains 12 sections. Identify ALL of the following:
+- "OGE001" through "OGE012" (Back Gondola Ends)
+Some sections may be labeled slightly differently (e.g., "OGE 007" instead of "OGE007") — normalize them.
 
-- This sheet contains 12 boxes labeled OGE001 through OGE012 (Back Gondola Ends).
-- Each box = one gondola end (aisle end) in the store.
-- Within each box, vertical rows = physical shelves (top to bottom).
-- If a row is split into two+ columns, multiple product groups share that shelf.
-- Each product has a NAME and a REF NUMBER (numeric code).
-- IGNORE any text that says "refer to visual" — these are not products.
+LAYOUT DETECTION — This is critical:
+For EACH section, determine the layout_type:
 
-YOUR TASK:
-Extract ALL product data following this EXACT spatial hierarchy:
+1. "standard_shelved" — Regular horizontal shelves (rows). Count the horizontal dividers.
+   Each shelf goes top-to-bottom: level 1 = top shelf, level 2 = next, etc.
 
-1. Identify all 12 boxes (OGE001-OGE012)
-2. For each box, determine the PROMOTION TYPE (e.g., "1/2 PRICE", "WEEKLY SPECIAL", etc.)
-3. Parse each shelf TOP TO BOTTOM (shelf 1 = top shelf)
-4. If a shelf has multiple columns/sections, list ALL products in their correct groups
-5. Capture EVERY product name and EVERY ref number
+2. "vertical_bulk" — Single full-height column, NO horizontal shelves.
+   Example: OGE007 "Bulk End" has a giant vertical block.
+   Items may be stacked vertically within this block (top items listed first).
+   Use "position" field: "top", "middle", "bottom" to show vertical placement.
 
-OUTPUT FORMAT — Return ONLY valid JSON with this exact structure:
+3. "side_stack" — Has "Side Stacks" or vertical columns alongside shelves.
+   These have products arranged in vertical columns.
+   Use "position": "left_stack", "right_stack", etc.
+
+CONTENT EXTRACTION:
+For each section, capture:
+- Header Text (e.g., "HEADER - 1/2 PRICE", "HEADER - 40% OFF")
+- Product Names
+- Ref Numbers (these are 5-7 digit numeric codes)
+- The header often tells you the promotion type
+
+CRITICAL — "ADDED" / "REMOVED" FLAGS:
+You will see small red or blue text labels next to some products saying "REMOVED" or "ADDED".
+These are VERY IMPORTANT for Tuesday night setups.
+- "REMOVED" = This product is being taken off the shelf this week
+- "ADDED" = This product is being put on the shelf this week
+Include these flags in the "status" field for each item.
+
+OUTPUT FORMAT — Return ONLY valid JSON with this exact adaptive structure:
 {
   "planogram_date": "07/05/25",
-  "category": "Back Gondola Ends",
-  "aisles": [
+  "sheet_type": "Back Gondola Ends",
+  "sections": [
     {
-      "id": "OGE001",
-      "promo_type": "1/2 PRICE",
+      "id": "OGE007",
+      "layout_type": "vertical_bulk",
+      "header": "HEADER - 40% OFF",
+      "notes": "BULK END ONLY - shelves to be removed",
+      "items": [
+        {"name": "Product Name", "ref": "123456", "position": "top", "status": "normal"},
+        {"name": "Another Product", "ref": "789012", "position": "bottom", "status": "added"}
+      ]
+    },
+    {
+      "id": "OGE003",
+      "layout_type": "standard_shelved",
+      "header": "HEADER - 1/2 PRICE",
+      "notes": "",
       "shelves": [
         {
           "level": 1,
-          "products": [
-            {"name": "Product Name Here", "ref": ["123456", "789012"]},
-            {"name": "Second Product Group", "ref": ["345678"]}
+          "items": [
+            {"name": "Product Name", "ref": "123456", "position": "default", "status": "normal"}
+          ]
+        },
+        {
+          "level": 2,
+          "items": [
+            {"name": "Product A", "ref": "789012", "position": "default", "status": "removed"},
+            {"name": "Product B", "ref": "345678", "position": "default", "status": "added"}
           ]
         }
       ]
@@ -117,10 +149,12 @@ OUTPUT FORMAT — Return ONLY valid JSON with this exact structure:
 
 IMPORTANT RULES:
 - Return ONLY the JSON object. No markdown, no explanations.
-- If a shelf has no products, include it with an empty products array.
-- If a shelf is split (two columns), include multiple product entries for that level.
-- Include ALL ref numbers found — they are critical for picking.
-- Double check you haven't missed any products across all 12 boxes.
+- For "standard_shelved" type: use the "shelves" array with "level" numbers.
+- For "vertical_bulk" and "side_stack" types: use the "items" array directly.
+- Include ALL products across ALL 15+ sections. Do not truncate.
+- status must be one of: "normal", "added", "removed"
+- If a product has no flag, use "normal".
+- Double-check every section has been captured.
 ''';
   }
 
