@@ -69,7 +69,15 @@ class PlanogramParser {
   String _buildPrompt() {
     return '''You are analyzing a Woolworths "Weekly Sales Plan" (Planogram) sheet for nightfill workers.
 
+
 CRITICAL CONTEXT:
+
+CRITICAL — DATE EXTRACTION RULE:
+Look at the VERY TOP HEADER of the sheet. Find the exact text "Sales Plan WC" or "Sales Plan W/C".
+The date immediately following that text IS the planogram_date (e.g., "07/05/25").
+Do NOT guess the date from any other numbers on the sheet. Only use the date after "Sales Plan WC".
+
+
 - This sheet contains 12 boxes labeled OGE001 through OGE012 (Back Gondola Ends).
 - Each box = one gondola end (aisle end) in the store.
 - Within each box, vertical rows = physical shelves (top to bottom).
@@ -144,7 +152,9 @@ IMPORTANT RULES:
             _extractNumericId(a.id).compareTo(_extractNumericId(b.id)));
 
       return Planogram(
-        planogramDate: planogram.planogramDate,
+        planogramDate: planogram.planogramDate.isNotEmpty
+            ? planogram.planogramDate
+            : 'Unknown Date',
         category: planogram.category.isNotEmpty
             ? planogram.category
             : 'Back Gondola Ends',
