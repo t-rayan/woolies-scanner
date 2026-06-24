@@ -96,7 +96,7 @@ Extract ALL product data following this EXACT spatial hierarchy:
 
 OUTPUT FORMAT — Return ONLY valid JSON with this exact structure:
 {
-  "planogram_date": "DD/MM/YY",
+  "planogram_date": "07/05/25",
   "category": "Back Gondola Ends",
   "aisles": [
     {
