@@ -381,6 +381,56 @@ class SupabaseService {
     return response.count ?? 0;
   }
 
+  /// Fetches all products grouped by aisle for a given sheet type (FGE/OGE) across all dates.
+  Future<List<AisleProductGroup>> fetchGroupedByAisleForSheet(
+      String sheet) async {
+    try {
+      final cleanSheet = sheet.toUpperCase().trim();
+      final response = await client
+          .from('scanned_products')
+          .select()
+          .eq('sheet_name', cleanSheet)
+          .order('aisle', ascending: true);
+
+      final rows = (response as List).cast<Map<String, dynamic>>();
+      final parsed = rows.map((r) => Product.fromMap(r)).toList();
+
+      final Map<String, List<Product>> grouped = {};
+      for (final p in parsed) {
+        final aisle = (p.aisle ?? 'GENERAL').toUpperCase();
+        grouped.putIfAbsent(aisle, () => []).add(p);
+      }
+
+      return grouped.entries
+          .map((e) => AisleProductGroup(aisle: e.key, products: e.value))
+          .toList();
+    } catch (e) {
+      _logError('fetchGroupedByAisleForSheet', e);
+      return [];
+    }
+  }
+
+  /// Counts total products for a given sheet type (FGE/OGE) across all dates.
+  Future<int> fetchCountBySheet(String sheet) async {
+    try {
+      final cleanSheet = sheet.toUpperCase().trim();
+      final rows = await client
+          .from('scanned_products')
+          .select('id')
+          .eq('sheet_name', cleanSheet);
+      return rows.length;
+    } catch (e) {
+      _logError('fetchCountBySheet', e);
+      return 0;
+    }
+  }
+
+  /// Deletes all products for a given sheet type (FGE/OGE) across all dates.
+  Future<void> deleteBySheet(String sheet) async {
+    final cleanSheet = sheet.toUpperCase().trim();
+    await client.from('scanned_products').delete().eq('sheet_name', cleanSheet);
+  }
+
   Future<void> clearAllData() async {
     await client.from('scanned_products').delete().neq('id', 0);
   }

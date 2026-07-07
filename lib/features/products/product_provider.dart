@@ -55,6 +55,29 @@ final groupedProductsBySheetProvider = FutureProvider.family<
   return svc.fetchGroupedByAisle(arg.date, arg.sheet);
 });
 
+/// Fetches grouped counts per sheet (OGE/FGE) for a given date.
+final groupedCountsProvider =
+    FutureProvider.family<List<SheetCategorySummary>, String>(
+        (ref, date) async {
+  final svc = ref.read(supabaseServiceProvider);
+  return svc.fetchGroupedCountsByDate(date);
+});
+
+/// Fetches counts for each sheet type (FGE / OGE) across ALL dates.
+final sheetCountsProvider = FutureProvider<Map<String, int>>((ref) async {
+  final svc = ref.watch(supabaseServiceProvider);
+  final fgeCount = await svc.fetchCountBySheet('FGE');
+  final ogeCount = await svc.fetchCountBySheet('OGE');
+  return {'FGE': fgeCount, 'OGE': ogeCount};
+});
+
+/// Fetches products grouped by aisle for a given sheet type (FGE/OGE) across ALL dates.
+final groupedProductsBySheetOnlyProvider =
+    FutureProvider.family<List<AisleProductGroup>, String>((ref, sheet) async {
+  final svc = ref.watch(supabaseServiceProvider);
+  return svc.fetchGroupedByAisleForSheet(sheet);
+});
+
 /// One-time fix: migrates any existing ENT products from OGE to FGE.
 /// No-op on Supabase since the schema already enforces correct routing.
 final fixEntDataProvider = FutureProvider<int>((ref) async {

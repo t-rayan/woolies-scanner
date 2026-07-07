@@ -35,6 +35,17 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     final String cleanDate = Uri.decodeComponent(widget.date ?? '').trim();
     final String cleanSheet = (widget.sheet ?? '').toUpperCase().trim();
 
+    // Determine the title: if sheet is provided, show sheet name; otherwise show date
+    final String title;
+    if (cleanSheet.isNotEmpty) {
+      title =
+          cleanSheet == 'FGE' ? 'FGE - Front & Entrance' : 'OGE - Back Ends';
+    } else if (cleanDate.isNotEmpty) {
+      title = cleanDate.toUpperCase();
+    } else {
+      title = 'PRODUCTS';
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -42,7 +53,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
         elevation: 0,
         centerTitle: true,
         title: Text(
-          cleanDate.toUpperCase(),
+          title,
           style: const TextStyle(
               color: AppColors.black,
               fontWeight: FontWeight.w900,
@@ -73,7 +84,24 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
     }
 
     // No sheet specified — show folder selection (OGE / FGE cards)
-    return _buildFolderSelection(date);
+    if (date.isNotEmpty) {
+      return _buildFolderSelection(date);
+    }
+
+    // No date and no sheet — empty state
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined,
+              size: 48, color: AppColors.lightGrey),
+          SizedBox(height: 16),
+          Text('NO PRODUCTS',
+              style: TextStyle(
+                  color: AppColors.grey, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
   }
 
   /// Shows OGE / FGE folder cards for the given date.
@@ -179,8 +207,10 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
   }
 
   Widget _buildSheetView({required String date, required String sheet}) {
-    final groupedAsync =
-        ref.watch(groupedProductsBySheetProvider((date: date, sheet: sheet)));
+    // Use sheet-only provider when no date is provided (across all dates)
+    final groupedAsync = date.isNotEmpty
+        ? ref.watch(groupedProductsBySheetProvider((date: date, sheet: sheet)))
+        : ref.watch(groupedProductsBySheetOnlyProvider(sheet));
 
     return groupedAsync.when(
       data: (groups) {
@@ -195,10 +225,13 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                 Text('NO PRODUCTS IN ${sheet.toUpperCase()}',
                     style: const TextStyle(
                         color: AppColors.grey, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text('DATE: $date',
-                    style:
-                        const TextStyle(fontSize: 10, color: AppColors.grey)),
+                if (date.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text('DATE: $date',
+                        style: const TextStyle(
+                            fontSize: 10, color: AppColors.grey)),
+                  ),
               ],
             ),
           );

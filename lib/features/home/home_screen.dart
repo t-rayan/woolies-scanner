@@ -75,15 +75,16 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  Future<void> _deleteEntireDate(
-      BuildContext context, WidgetRef ref, String date) async {
+  Future<void> _deleteSheetCategory(
+      BuildContext context, WidgetRef ref, String sheet) async {
+    final label = sheet == 'FGE' ? 'FGE - Front & Entrance' : 'OGE - Back Ends';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('DELETE COLLECTION',
             style: TextStyle(fontWeight: FontWeight.bold)),
         content: Text(
-          'Delete ALL products scanned on $date?\n\n'
+          'Delete ALL $label products?\n\n'
           'This action cannot be undone.',
         ),
         actions: [
@@ -103,8 +104,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
 
     if (confirmed == true) {
-      await ref.read(supabaseServiceProvider).deleteByDate(date);
-      ref.invalidate(planogramDatesProvider);
+      await ref.read(supabaseServiceProvider).deleteBySheet(sheet);
+      ref.invalidate(sheetCountsProvider);
       ref.invalidate(totalDatabaseItemsProvider);
     }
   }
@@ -112,7 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final dbCountAsync = ref.watch(totalDatabaseItemsProvider);
-    final datesAsync = ref.watch(planogramDatesProvider);
+    final sheetCountsAsync = ref.watch(sheetCountsProvider);
 
     // 🔐 Read authentication session state parameters
     final authAsync = ref.watch(authSessionProvider);
@@ -154,10 +155,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       body: dbCountAsync.when(
         data: (count) {
-          return datesAsync.when(
-            data: (dates) {
-              if (dates.isEmpty) return _buildEmptyState();
-              return _buildDateList(context, ref, dates, count, isAdmin);
+          return sheetCountsAsync.when(
+            data: (sheetCounts) {
+              final totalSheets = sheetCounts['FGE']! + sheetCounts['OGE']!;
+              if (totalSheets == 0) return _buildEmptyState();
+              return _buildSheetList(context, ref, sheetCounts, count, isAdmin);
             },
             loading: () => const Center(
                 child: CircularProgressIndicator(color: AppColors.black)),
@@ -206,7 +208,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ElevatedButton(
                   onPressed: () {
                     ref.invalidate(totalDatabaseItemsProvider);
-                    ref.invalidate(planogramDatesProvider);
+                    ref.invalidate(sheetCountsProvider);
                   },
                   child: const Text('RETRY'),
                 ),
@@ -258,8 +260,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildDateList(BuildContext context, WidgetRef ref, List<String> dates,
-      int totalCount, bool isAdmin) {
+  Widget _buildSheetList(BuildContext context, WidgetRef ref,
+      Map<String, int> sheetCounts, int totalCount, bool isAdmin) {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -286,48 +288,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         const SizedBox(height: 24),
-        ...dates.map((date) => _buildDateFolder(context, ref, date, isAdmin)),
+        _buildSheetFolder(
+          context,
+          ref,
+          sheet: 'OGE',
+          label: 'OGE - Back Ends',
+          icon: Icons.shelves,
+          count: sheetCounts['OGE'] ?? 0,
+          isAdmin: isAdmin,
+        ),
+        const SizedBox(height: 12),
+        _buildSheetFolder(
+          context,
+          ref,
+          sheet: 'FGE',
+          label: 'FGE - Front & Entrance',
+          icon: Icons.storefront_rounded,
+          count: sheetCounts['FGE'] ?? 0,
+          isAdmin: isAdmin,
+        ),
       ],
     );
   }
 
-  /// Single date folder — delete actions scale visibility purely based on auth variables.
-  Widget _buildDateFolder(
-      BuildContext context, WidgetRef ref, String date, bool isAdmin) {
+  /// Single sheet folder (FGE or OGE).
+  Widget _buildSheetFolder(
+    BuildContext context,
+    WidgetRef ref, {
+    required String sheet,
+    required String label,
+    required IconData icon,
+    required int count,
+    required bool isAdmin,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () {
-          final encodedDate = Uri.encodeComponent(date);
-          context.push('/database?date=$encodedDate');
+          context.push('/database?sheet=$sheet');
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppColors.white,
-            // color: Colors.green.shade800,
-            border: Border.all(color: AppColors.lightGrey, width: 1.5),
+            border: Border.all(color: AppColors.black, width: 2),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              const Icon(Icons.folder_rounded,
-                  size: 32, color: AppColors.black),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.black,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 28, color: AppColors.white),
+              ),
               const SizedBox(width: 16),
               Expanded(
-                child: Text(date,
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.black)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.black)),
+                    const SizedBox(height: 4),
+                    Text(
+                      count == 0
+                          ? 'No products'
+                          : '$count product${count == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.grey,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
-              // 🛠️ The delete tray button is locked behind the verification validation check
-              if (isAdmin)
+              if (isAdmin && count > 0)
                 IconButton(
                   icon: const Icon(Icons.delete_outline_rounded,
                       color: AppColors.grey, size: 22),
-                  onPressed: () => _deleteEntireDate(context, ref, date),
+                  onPressed: () => _deleteSheetCategory(context, ref, sheet),
                 ),
               const Icon(Icons.chevron_right_rounded, color: AppColors.grey),
             ],
@@ -337,11 +382,3 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
-
-/// Provider to fetch grouped counts per sheet for a date.
-final groupedCountsProvider =
-    FutureProvider.family<List<SheetCategorySummary>, String>(
-        (ref, date) async {
-  final svc = ref.read(supabaseServiceProvider);
-  return svc.fetchGroupedCountsByDate(date);
-});
