@@ -73,8 +73,29 @@ class GeminiPlanogramNotifier extends StateNotifier<AsyncValue<Planogram?>> {
 
       final content = [
         Content.multi([
-          TextPart(
-              'Analyze this planogram layout. Extract structured data matching the schema provided.'),
+          TextPart('''
+You are an expert Woolworths Planogram Analyst. Follow these steps exactly:
+
+1. SHEET CLASSIFICATION:
+   - Examine the sheet title at the very top.
+   - If the title contains "FRONT GONDOLA", categorize this entire sheet as "FGE".
+   - If the title contains "BACK GONDOLA", categorize this entire sheet as "OGE".
+
+2. DATE EXTRACTION:
+   - Look at the top center of the page.
+   - Find the text starting with "Sales Plan WC".
+   - Extract the specific date immediately following "WC" (e.g., "08/07/26"). This is your `planogram_date`.
+
+3. DATA EXTRACTION:
+   - Scan the grid. Each block header is a unique Aisle ID (e.g., FGE001, OGE001).
+   - Capture the promo offer (if present) and all products per shelf.
+   - For every product, capture the "Name" and the "Ref" (barcode).
+   - If a side-column exists (like "Vendor Bin"), extract that content into the "side_notes" field.
+
+4. OUTPUT: 
+   - Return valid JSON matching the schema. 
+   - If a field is not present, use null. Do not hallucinate data.
+'''),
           DataPart(mimeType, imageBytes),
         ])
       ];
